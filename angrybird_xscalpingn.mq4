@@ -1,9 +1,9 @@
 uchar bit_flags            = 0;
 bool flag                  = FALSE; /* bit flag 00000001 */
-bool long_trade            = FALSE; /* bit flag 00000010 */
-bool new_orders_placed     = FALSE; /* bit flag 00000100 */
-bool short_trade           = FALSE; /* bit flag 00001000 */
-bool trade_now             = FALSE; /* bit flag 00010000 */
+bool trade_now             = FALSE; /* bit flag 00000010 */
+bool short_trade           = FALSE; /* bit flag 00000100 */
+bool long_trade            = FALSE; /* bit flag 00001000 */
+bool new_orders_placed     = FALSE; /* bit flag 00010000 */
 bool use_equity_stop       = FALSE; /* bit flag 00100000 */
 bool use_timeout           = FALSE; /* bit flag 01000000 */
 bool use_trailing_stop     = FALSE; /* bit flag 10000000 */
@@ -59,9 +59,7 @@ int init() {
 int deinit() { return (0); }
 
 /* Debug */
-void Debug() {
-  Comment("Bit flags: " + bit_flags);
-}
+void Debug() { Comment("Bit flags: " + bit_flags); }
 
 /* Start loop */
 int start() {
@@ -117,7 +115,7 @@ int start() {
 
   /* Trades */
   total = CountTrades();
-  if (total == 0) flag = FALSE;
+  if (total == 0) bit_flags ^= (1 << 0);
   for (cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
     if (!OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES)) {
       CheckError();
@@ -143,16 +141,21 @@ int start() {
     RefreshRates();
     LastBuyPrice = FindLastBuyPrice();
     LastSellPrice = FindLastSellPrice();
-    if (long_trade && LastBuyPrice - Ask >= PipStep * Point) trade_now = TRUE;
-    if (short_trade && Bid - LastSellPrice >= PipStep * Point) trade_now = TRUE;
+    if (long_trade && LastBuyPrice - Ask >= PipStep * Point)
+      bit_flags |= (1 << 2);
+    Debug();
+    if (short_trade && Bid - LastSellPrice >= PipStep * Point)
+      bit_flags |= (1 << 2);
+    Debug();
   }
   if (total < 1) {
     short_trade = FALSE;
     long_trade = FALSE;
-    trade_now = TRUE;
+    bit_flags |= (1 << 2);
+    Debug();
     StartEquity = AccountEquity();
   }
-  if (trade_now) {
+  if ((bit_flags & (1 << 2)) != 0) {
     LastBuyPrice = FindLastBuyPrice();
     LastSellPrice = FindLastSellPrice();
     if (short_trade) {
@@ -165,7 +168,7 @@ int start() {
                                 MagicNumber, 0, HotPink);
       Print(CountTrades());
       LastSellPrice = FindLastSellPrice();
-      trade_now = FALSE;
+      bit_flags ^= (1 << 2);
       new_orders_placed = TRUE;
     } else {
       if (long_trade) {
@@ -176,7 +179,7 @@ int start() {
                                   EAName + "-" + NumOfTrades + "-" + PipStep,
                                   MagicNumber, 0, Lime);
         LastBuyPrice = FindLastBuyPrice();
-        trade_now = FALSE;
+        bit_flags ^= (1 << 2);
         new_orders_placed = TRUE;
       }
     }
@@ -185,7 +188,7 @@ int start() {
       return (-1);
     }
   }
-  if (trade_now && total < 1) {
+  if ((bit_flags & (1 << 2)) != 0 && total < 1) {
     double PrevCl = iClose(Symbol(), 0, 2);
     double CurrCl = iClose(Symbol(), 0, 1);
     SellLimit = Bid;
@@ -217,7 +220,7 @@ int start() {
       } else {
         expiration = TimeCurrent() + 60.0 * (60.0 * MaxTradeOpenHours);
       }
-      trade_now = FALSE;
+      bit_flags ^= (1 << 2);
     }
   }
   total = CountTrades();
@@ -249,7 +252,7 @@ int start() {
           PriceTarget = AveragePrice + take_profit * Point;
           BuyTarget = PriceTarget;
           Stopper = AveragePrice - Stoploss * Point;
-          flag = TRUE;
+          bit_flags |= (1 << 0);
         }
       }
       if (OrderSymbol() == Symbol() && OrderMagicNumber() == MagicNumber) {
@@ -257,13 +260,13 @@ int start() {
           PriceTarget = AveragePrice - take_profit * Point;
           SellTarget = PriceTarget;
           Stopper = AveragePrice + Stoploss * Point;
-          flag = TRUE;
+          bit_flags |= (1 << 0);
         }
       }
     }
   }
   if (new_orders_placed) {
-    if (flag == TRUE) {
+    if ((bit_flags & (1 << 0)) != 0) {
       for (cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
         if (!OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES)) {
           CheckError();
