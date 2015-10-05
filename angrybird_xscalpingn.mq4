@@ -1,53 +1,52 @@
-uchar bit_flags            = 0;
-bool flag                  = FALSE; /* bit flag 00000001 */
-bool trade_now             = FALSE; /* bit flag 00000010 */
-bool short_trade           = FALSE; /* bit flag 00000100 */
-bool long_trade            = FALSE; /* bit flag 00001000 */
-bool new_orders_placed     = FALSE; /* bit flag 00010000 */
-bool use_equity_stop       = FALSE; /* bit flag 00100000 */
-bool use_timeout           = FALSE; /* bit flag 01000000 */
-bool use_trailing_stop     = FALSE; /* bit flag 10000000 */
-double AccntEquityHighAmt  = 0;
-double AveragePrice        = 0;
-double BuyLimit            = 0;
-double BuyTarget           = 0;
-double Drop                = 500;
-double iLots               = 0;
-double LastBuyPrice        = 0;
-double LastSellPrice       = 0;
-double MaxTradeOpenHours   = 48.0;
-double PrevEquity          = 0;
-double PriceTarget         = 0;
-double RsiMaximum          = 70.0;
-double RsiMinimum          = 30.0;
-double SellLimit           = 0;
-double SellTarget          = 0;
-double slip                = 3.0;
-double Spread              = 0;
-double StartEquity         = 0;
-double Stoploss            = 500.0;
-double Stopper             = 0.0;
-double TotalEquityRisk     = 20.0;
-double TrailStart          = 10.0;
-extern bool dynamic_pips   = TRUE;
+bool flag = FALSE;
+bool long_trade = FALSE;
+bool NewOrdersPlaced = FALSE;
+bool ShortTrade = FALSE;
+bool TradeNow = FALSE;
+bool UseEquityStop = FALSE;
+bool UseTimeOut = FALSE;
+bool UseTrailingStop = FALSE;
+double AccntEquityHighAmt = 0;
+double AveragePrice = 0;
+double BuyLimit = 0;
+double BuyTarget = 0;
+double Drop = 500;
+double iLots = 0;
+double LastBuyPrice = 0;
+double LastSellPrice = 0;
+double MaxTradeOpenHours = 48.0;
+double PrevEquity = 0;
+double PriceTarget = 0;
+double RsiMaximum = 70.0;
+double RsiMinimum = 30.0;
+double SellLimit = 0;
+double SellTarget = 0;
+double slip = 3.0;
+double Spread = 0;
+double StartEquity = 0;
+double Stoploss = 500.0;
+double Stopper = 0.0;
+double TotalEquityRisk = 20.0;
+double TrailStart = 10.0;
+extern bool dynamic_pips = TRUE; /* Should be comments for these */
 extern double lot_exponent = 2;
-extern double lots         = 0.01;
-extern double take_profit  = 1500.0;
-extern double trail_stop   = 9000;
-extern int max_trades      = 5;
-extern int min_pip_height  = 1500;
-extern int pip_divisor     = 2;
-extern int pip_memory      = 120;
-int cnt                    = 0;
-int expiration             = 0;
-int lotdecimal             = 2;
-int MagicNumber            = 2222;
-int NumOfTrades            = 0;
-int PipStep                = 0;
-int ticket                 = 0;
-int timeprev               = 0;
-int total                  = 0;
-string EAName              = "Ilan1.6";
+extern double lots = 0.01;
+extern double take_profit = 20.0;
+extern double trail_stop = 10.0;
+extern int max_trades = 10;
+extern int min_pip_height = 12;
+extern int pip_divisor = 3;
+extern int pip_memory = 24;
+int cnt = 0;
+int expiration = 0;
+int lotdecimal = 2;
+int MagicNumber = 2222;
+int NumOfTrades = 0;
+int PipStep = 0;
+int ticket = 0;
+int timeprev = 0;
+int total = 0;
+string EAName = "Ilan1.6";
 
 /* Init */
 int init() {
@@ -58,13 +57,8 @@ int init() {
 /* Deinit */
 int deinit() { return (0); }
 
-/* Debug */
-void Debug() { Comment("Bit flags: " + bit_flags); }
-
 /* Start loop */
 int start() {
-  /* Debug */
-  Debug();
   /* Dynamic Pips */
   if (dynamic_pips) {
     /* Calculate highest and lowest price from last bar to X bars ago */
@@ -84,12 +78,12 @@ int start() {
   }
 
   /* Trailing stop */
-  if (use_trailing_stop) {
+  if (UseTrailingStop) {
     TrailingAlls(TrailStart, trail_stop, AveragePrice);
   }
 
   /* Timeout */
-  if ((iCCI(NULL, 15, 55, 0, 0) > Drop && short_trade) ||
+  if ((iCCI(NULL, 15, 55, 0, 0) > Drop && ShortTrade) ||
       (iCCI(NULL, 15, 55, 0, 0) < (-Drop) && long_trade)) {
     CloseThisSymbolAll();
     Print("Closed All due to TimeOut");
@@ -103,19 +97,19 @@ int start() {
 
   /* Equitiy stop */
   double CurrentPairProfit = CalculateProfit();
-  if (use_equity_stop) {
+  if (UseEquityStop) {
     if (CurrentPairProfit < 0.0 &&
         MathAbs(CurrentPairProfit) >
             TotalEquityRisk / 100.0 * AccountEquityHigh()) {
       CloseThisSymbolAll();
       Print("Closed All due to Stop Out");
-      new_orders_placed = FALSE;
+      NewOrdersPlaced = FALSE;
     }
   }
 
   /* Trades */
   total = CountTrades();
-  if (total == 0) bit_flags ^= (1 << 0);
+  if (total == 0) flag = FALSE;
   for (cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
     if (!OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES)) {
       CheckError();
@@ -125,14 +119,14 @@ int start() {
     if (OrderSymbol() == Symbol() && OrderMagicNumber() == MagicNumber) {
       if (OrderType() == OP_BUY) {
         long_trade = TRUE;
-        short_trade = FALSE;
+        ShortTrade = FALSE;
         break;
       }
     }
     if (OrderSymbol() == Symbol() && OrderMagicNumber() == MagicNumber) {
       if (OrderType() == OP_SELL) {
         long_trade = FALSE;
-        short_trade = TRUE;
+        ShortTrade = TRUE;
         break;
       }
     }
@@ -141,24 +135,19 @@ int start() {
     RefreshRates();
     LastBuyPrice = FindLastBuyPrice();
     LastSellPrice = FindLastSellPrice();
-    if (long_trade && LastBuyPrice - Ask >= PipStep * Point)
-      bit_flags |= (1 << 2);
-    Debug();
-    if (short_trade && Bid - LastSellPrice >= PipStep * Point)
-      bit_flags |= (1 << 2);
-    Debug();
+    if (long_trade && LastBuyPrice - Ask >= PipStep * Point) TradeNow = TRUE;
+    if (ShortTrade && Bid - LastSellPrice >= PipStep * Point) TradeNow = TRUE;
   }
   if (total < 1) {
-    short_trade = FALSE;
+    ShortTrade = FALSE;
     long_trade = FALSE;
-    bit_flags |= (1 << 2);
-    Debug();
+    TradeNow = TRUE;
     StartEquity = AccountEquity();
   }
-  if ((bit_flags & (1 << 2)) != 0) {
+  if (TradeNow) {
     LastBuyPrice = FindLastBuyPrice();
     LastSellPrice = FindLastSellPrice();
-    if (short_trade) {
+    if (ShortTrade) {
       NumOfTrades = total;
       iLots = NormalizeDouble(lots * MathPow(lot_exponent, NumOfTrades),
                               lotdecimal);
@@ -168,8 +157,8 @@ int start() {
                                 MagicNumber, 0, HotPink);
       Print(CountTrades());
       LastSellPrice = FindLastSellPrice();
-      bit_flags ^= (1 << 2);
-      new_orders_placed = TRUE;
+      TradeNow = FALSE;
+      NewOrdersPlaced = TRUE;
     } else {
       if (long_trade) {
         NumOfTrades = total;
@@ -179,8 +168,8 @@ int start() {
                                   EAName + "-" + NumOfTrades + "-" + PipStep,
                                   MagicNumber, 0, Lime);
         LastBuyPrice = FindLastBuyPrice();
-        bit_flags ^= (1 << 2);
-        new_orders_placed = TRUE;
+        TradeNow = FALSE;
+        NewOrdersPlaced = TRUE;
       }
     }
     if (ticket < 0) {
@@ -188,12 +177,12 @@ int start() {
       return (-1);
     }
   }
-  if ((bit_flags & (1 << 2)) != 0 && total < 1) {
+  if (TradeNow && total < 1) {
     double PrevCl = iClose(Symbol(), 0, 2);
     double CurrCl = iClose(Symbol(), 0, 1);
     SellLimit = Bid;
     BuyLimit = Ask;
-    if (!short_trade && !long_trade) {
+    if (!ShortTrade && !long_trade) {
       NumOfTrades = total;
       iLots = NormalizeDouble(lots * MathPow(lot_exponent, NumOfTrades),
                               lotdecimal);
@@ -203,7 +192,7 @@ int start() {
                                     EAName + "-" + NumOfTrades, MagicNumber, 0,
                                     HotPink);
           LastBuyPrice = FindLastBuyPrice();
-          new_orders_placed = TRUE;
+          NewOrdersPlaced = TRUE;
         }
       } else {
         if (iRSI(NULL, PERIOD_H1, 14, PRICE_CLOSE, 1) < RsiMaximum) {
@@ -211,7 +200,7 @@ int start() {
                                     EAName + "-" + NumOfTrades, MagicNumber, 0,
                                     Lime);
           LastSellPrice = FindLastSellPrice();
-          new_orders_placed = TRUE;
+          NewOrdersPlaced = TRUE;
         }
       }
       if (ticket < 0) {
@@ -220,7 +209,7 @@ int start() {
       } else {
         expiration = TimeCurrent() + 60.0 * (60.0 * MaxTradeOpenHours);
       }
-      bit_flags ^= (1 << 2);
+      TradeNow = FALSE;
     }
   }
   total = CountTrades();
@@ -240,7 +229,7 @@ int start() {
     }
   }
   if (total > 0) AveragePrice = NormalizeDouble(AveragePrice / Count, Digits);
-  if (new_orders_placed) {
+  if (NewOrdersPlaced) {
     for (cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
       if (!OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES)) {
         CheckError();
@@ -252,7 +241,7 @@ int start() {
           PriceTarget = AveragePrice + take_profit * Point;
           BuyTarget = PriceTarget;
           Stopper = AveragePrice - Stoploss * Point;
-          bit_flags |= (1 << 0);
+          flag = TRUE;
         }
       }
       if (OrderSymbol() == Symbol() && OrderMagicNumber() == MagicNumber) {
@@ -260,13 +249,13 @@ int start() {
           PriceTarget = AveragePrice - take_profit * Point;
           SellTarget = PriceTarget;
           Stopper = AveragePrice + Stoploss * Point;
-          bit_flags |= (1 << 0);
+          flag = TRUE;
         }
       }
     }
   }
-  if (new_orders_placed) {
-    if ((bit_flags & (1 << 0)) != 0) {
+  if (NewOrdersPlaced) {
+    if (flag == TRUE) {
       for (cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
         if (!OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES)) {
           CheckError();
@@ -280,7 +269,7 @@ int start() {
             CheckError();
           }
         }
-        new_orders_placed = FALSE;
+        NewOrdersPlaced = FALSE;
       }
     }
   }
