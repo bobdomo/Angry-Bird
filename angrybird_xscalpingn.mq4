@@ -67,15 +67,16 @@ int start() {
     /* Calculate pips for spread between orders */
     PipStep = NormalizeDouble((hival - loval) / pip_divisor / Point, 0);
     /* If dynamic pips fail, assign pips extreme value */
-    if (PipStep < min_pip_height / pip_divisor) {
+    if (PipStep < min_pip_height) {
       PipStep = NormalizeDouble(min_pip_height / pip_divisor, 0);
     }
-    if (PipStep > min_pip_height * pip_divisor) {
-      PipStep = NormalizeDouble(min_pip_height * pip_divisor, 0);
-    }
+    //if (PipStep > min_pip_height * pip_divisor) {
+    //  PipStep = NormalizeDouble(min_pip_height * pip_divisor, 0);
+    //}
   } else {
     PipStep = min_pip_height;
   }
+  Comment(PipStep);
 
   /* Trailing stop */
   if (UseTrailingStop) {
@@ -85,7 +86,7 @@ int start() {
   /* Timeout */
   if ((iCCI(NULL, 15, 55, 0, 0) > Drop && ShortTrade) ||
       (iCCI(NULL, 15, 55, 0, 0) < (-Drop) && long_trade)) {
-    CloseThisSymbolAll();
+    //CloseThisSymbolAll();
     Print("Closed All due to TimeOut");
   }
 
@@ -186,7 +187,7 @@ int start() {
       NumOfTrades = total;
       iLots = NormalizeDouble(lots * MathPow(lot_exponent, NumOfTrades),
                               lotdecimal);
-      if (PrevCl > CurrCl) {
+      if (iRSI(NULL, 0, 14, PRICE_TYPICAL, 1) > 50) {
         if (iRSI(NULL, PERIOD_H1, 14, PRICE_CLOSE, 1) > RsiMinimum) {
           ticket = OpenPendingOrder(1, iLots, SellLimit, slip, SellLimit, 0, 0,
                                     EAName + "-" + NumOfTrades, MagicNumber, 0,
@@ -223,6 +224,10 @@ int start() {
       continue;
     if (OrderSymbol() == Symbol() && OrderMagicNumber() == MagicNumber) {
       if (OrderType() == OP_BUY || OrderType() == OP_SELL) {
+        //AveragePrice += ((OrderClosePrice() + OrderClosePrice() + OrderOpenPrice()) / 3) * OrderLots();
+        //AveragePrice += ((OrderClosePrice() + OrderOpenPrice() + OrderOpenPrice()) / 3) * OrderLots();
+        //AveragePrice += ((OrderClosePrice() + OrderOpenPrice()) / 2) * OrderLots();
+        //AveragePrice += OrderClosePrice() * OrderLots();
         AveragePrice += OrderOpenPrice() * OrderLots();
         Count += OrderLots();
       }
