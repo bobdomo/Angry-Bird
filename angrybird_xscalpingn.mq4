@@ -1,3 +1,5 @@
+// extern double trail_stop = 10.0;
+bool dynamic_pips = TRUE; /* Should be comments for these */
 bool flag = FALSE;
 bool long_trade = FALSE;
 bool NewOrdersPlaced = FALSE;
@@ -17,8 +19,6 @@ double LastSellPrice = 0;
 double MaxTradeOpenHours = 48.0;
 double PrevEquity = 0;
 double PriceTarget = 0;
-double RsiMaximum = 70.0;
-double RsiMinimum = 30.0;
 double SellLimit = 0;
 double SellTarget = 0;
 double slip = 3.0;
@@ -28,15 +28,15 @@ double Stoploss = 500.0;
 double Stopper = 0.0;
 double TotalEquityRisk = 20.0;
 double TrailStart = 10.0;
-extern bool dynamic_pips = TRUE; /* Should be comments for these */
-extern double lot_exponent = 2;
+extern double lot_exponent = 2.0;
 extern double lots = 0.01;
-extern double take_profit = 20.0;
-extern double trail_stop = 10.0;
-extern int max_trades = 10;
-extern int min_pip_height = 12;
+extern double rsi_maximum = 70.0;
+extern double rsi_minimum = 30.0;
+extern double take_profit = 1200.0;
+extern int max_trades = 20;
+extern int min_pip_height = 100;
 extern int pip_divisor = 3;
-extern int pip_memory = 24;
+extern int pip_memory = 6;
 int cnt = 0;
 int expiration = 0;
 int lotdecimal = 2;
@@ -70,7 +70,7 @@ int start() {
     if (PipStep < min_pip_height) {
       PipStep = NormalizeDouble(min_pip_height / pip_divisor, 0);
     }
-    //if (PipStep > min_pip_height * pip_divisor) {
+    // if (PipStep > min_pip_height * pip_divisor) {
     //  PipStep = NormalizeDouble(min_pip_height * pip_divisor, 0);
     //}
   } else {
@@ -78,22 +78,23 @@ int start() {
   }
   Comment(PipStep);
 
-  /* Trailing stop */
+  /* Trailing stop
   if (UseTrailingStop) {
     TrailingAlls(TrailStart, trail_stop, AveragePrice);
   }
+  */
 
   /* Timeout */
   if ((iCCI(NULL, 15, 55, 0, 0) > Drop && ShortTrade) ||
       (iCCI(NULL, 15, 55, 0, 0) < (-Drop) && long_trade)) {
-    //CloseThisSymbolAll();
+    // CloseThisSymbolAll();
     Print("Closed All due to TimeOut");
   }
 
-  /* ??? */
   if (timeprev == Time[0]) {
     return (0);
   }
+
   timeprev = Time[0];
 
   /* Equitiy stop */
@@ -111,6 +112,7 @@ int start() {
   /* Trades */
   total = CountTrades();
   if (total == 0) flag = FALSE;
+
   for (cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
     if (!OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES)) {
       CheckError();
@@ -132,6 +134,7 @@ int start() {
       }
     }
   }
+
   if (total > 0 && total <= max_trades) {
     RefreshRates();
     LastBuyPrice = FindLastBuyPrice();
@@ -183,20 +186,22 @@ int start() {
     double CurrCl = iClose(Symbol(), 0, 1);
     SellLimit = Bid;
     BuyLimit = Ask;
+
     if (!ShortTrade && !long_trade) {
       NumOfTrades = total;
       iLots = NormalizeDouble(lots * MathPow(lot_exponent, NumOfTrades),
                               lotdecimal);
-      if (iRSI(NULL, 0, 14, PRICE_TYPICAL, 1) > 50) {
-        if (iRSI(NULL, PERIOD_H1, 14, PRICE_CLOSE, 1) > RsiMinimum) {
+
+      if (iRSI(NULL, 0, 14, PRICE_TYPICAL, 1) > rsi_maximum) {
+        if (iRSI(NULL, PERIOD_H1, 14, PRICE_CLOSE, 1) > rsi_minimum) {
           ticket = OpenPendingOrder(1, iLots, SellLimit, slip, SellLimit, 0, 0,
                                     EAName + "-" + NumOfTrades, MagicNumber, 0,
                                     HotPink);
           LastBuyPrice = FindLastBuyPrice();
           NewOrdersPlaced = TRUE;
         }
-      } else {
-        if (iRSI(NULL, PERIOD_H1, 14, PRICE_CLOSE, 1) < RsiMaximum) {
+      } else if (iRSI(NULL, 0, 14, PRICE_TYPICAL, 1) < rsi_minimum) {
+        if (iRSI(NULL, PERIOD_H1, 14, PRICE_CLOSE, 1) < rsi_maximum) {
           ticket = OpenPendingOrder(0, iLots, BuyLimit, slip, BuyLimit, 0, 0,
                                     EAName + "-" + NumOfTrades, MagicNumber, 0,
                                     Lime);
@@ -224,10 +229,13 @@ int start() {
       continue;
     if (OrderSymbol() == Symbol() && OrderMagicNumber() == MagicNumber) {
       if (OrderType() == OP_BUY || OrderType() == OP_SELL) {
-        //AveragePrice += ((OrderClosePrice() + OrderClosePrice() + OrderOpenPrice()) / 3) * OrderLots();
-        //AveragePrice += ((OrderClosePrice() + OrderOpenPrice() + OrderOpenPrice()) / 3) * OrderLots();
-        //AveragePrice += ((OrderClosePrice() + OrderOpenPrice()) / 2) * OrderLots();
-        //AveragePrice += OrderClosePrice() * OrderLots();
+        // AveragePrice += ((OrderClosePrice() + OrderClosePrice() +
+        // OrderOpenPrice()) / 3) * OrderLots();
+        // AveragePrice += ((OrderClosePrice() + OrderOpenPrice() +
+        // OrderOpenPrice()) / 3) * OrderLots();
+        // AveragePrice += ((OrderClosePrice() + OrderOpenPrice()) / 2) *
+        // OrderLots();
+        // AveragePrice += OrderClosePrice() * OrderLots();
         AveragePrice += OrderOpenPrice() * OrderLots();
         Count += OrderLots();
       }
