@@ -68,7 +68,7 @@ int start() {
     PipStep = NormalizeDouble((hival - loval) / pip_divisor / Point, 0);
     /* If dynamic pips fail, assign pips extreme value */
     if (PipStep < min_pip_height) {
-      PipStep = NormalizeDouble(min_pip_height / pip_divisor, 0);
+      PipStep = NormalizeDouble(min_pip_height, 0);
     }
     // if (PipStep > min_pip_height * pip_divisor) {
     //  PipStep = NormalizeDouble(min_pip_height * pip_divisor, 0);
@@ -182,42 +182,45 @@ int start() {
     }
   }
   if (TradeNow && total < 1) {
-    double PrevCl = iClose(Symbol(), 0, 2);
-    double CurrCl = iClose(Symbol(), 0, 1);
+    // double PrevCl = iClose(Symbol(), 0, 2);
+    // double CurrCl = iClose(Symbol(), 0, 1);
     SellLimit = Bid;
     BuyLimit = Ask;
 
     if (!ShortTrade && !long_trade) {
-      NumOfTrades = total;
-      iLots = NormalizeDouble(lots * MathPow(lot_exponent, NumOfTrades),
-                              lotdecimal);
-
       if (iRSI(NULL, 0, 14, PRICE_TYPICAL, 1) > rsi_maximum) {
-        if (iRSI(NULL, PERIOD_H1, 14, PRICE_CLOSE, 1) > rsi_minimum) {
-          ticket = OpenPendingOrder(1, iLots, SellLimit, slip, SellLimit, 0, 0,
-                                    EAName + "-" + NumOfTrades, MagicNumber, 0,
-                                    HotPink);
-          LastBuyPrice = FindLastBuyPrice();
-          NewOrdersPlaced = TRUE;
-        }
+        NumOfTrades = total;
+        iLots = NormalizeDouble(lots * MathPow(lot_exponent, NumOfTrades),
+                                lotdecimal);
+
+        ticket = OpenPendingOrder(1, iLots, SellLimit, slip, SellLimit, 0, 0,
+                                  EAName + "-" + NumOfTrades, MagicNumber, 0,
+                                  HotPink);
+        LastBuyPrice = FindLastBuyPrice();
+        NewOrdersPlaced = TRUE;
+        TradeNow = FALSE;
       } else if (iRSI(NULL, 0, 14, PRICE_TYPICAL, 1) < rsi_minimum) {
-        if (iRSI(NULL, PERIOD_H1, 14, PRICE_CLOSE, 1) < rsi_maximum) {
-          ticket = OpenPendingOrder(0, iLots, BuyLimit, slip, BuyLimit, 0, 0,
-                                    EAName + "-" + NumOfTrades, MagicNumber, 0,
-                                    Lime);
-          LastSellPrice = FindLastSellPrice();
-          NewOrdersPlaced = TRUE;
-        }
+        NumOfTrades = total;
+        iLots = NormalizeDouble(lots * MathPow(lot_exponent, NumOfTrades),
+                                lotdecimal);
+
+        ticket =
+            OpenPendingOrder(0, iLots, BuyLimit, slip, BuyLimit, 0, 0,
+                             EAName + "-" + NumOfTrades, MagicNumber, 0, Lime);
+        LastSellPrice = FindLastSellPrice();
+        NewOrdersPlaced = TRUE;
+        TradeNow = FALSE;
       }
+
       if (ticket < 0) {
         CheckError();
         return (0);
       } else {
         expiration = TimeCurrent() + 60.0 * (60.0 * MaxTradeOpenHours);
       }
-      TradeNow = FALSE;
     }
   }
+
   total = CountTrades();
   AveragePrice = 0;
   double Count = 0;
