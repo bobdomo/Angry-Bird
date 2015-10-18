@@ -146,17 +146,17 @@ int start() {
     
     /* Short = sell */
     
-    if (ShortTrade && Bid > LastSellPrice) {
-      if (iStochastic(NULL, 0, i_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 0) >= i_maximum &&
-          iStochastic(NULL, 0, i_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 1) <= i_maximum) {
+    if (ShortTrade && Bid - LastSellPrice >= PipStep * Point) {
+      if (iStochastic(NULL, 0, i_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 0) > i_maximum &&
+          iStochastic(NULL, 0, i_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 1) < i_maximum) {
             TradeNow = TRUE;
           } else {
             TradeNow = FALSE;
           }
     }
-    else if (long_trade && Ask < LastBuyPrice) {
-      if (iStochastic(NULL, 0, i_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 0) <= i_minimum &&
-          iStochastic(NULL, 0, i_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 1) >= i_minimum) {
+    else if (long_trade && LastBuyPrice - Ask >= PipStep * Point) {
+      if (iStochastic(NULL, 0, i_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 0) < i_minimum &&
+          iStochastic(NULL, 0, i_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 1) > i_minimum) {
             TradeNow = TRUE;
           } else {
             TradeNow = FALSE;
