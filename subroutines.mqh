@@ -2,11 +2,7 @@ int CountTrades() {
   int count = 0;
 
   for (int trade = OrdersTotal() - 1; trade >= 0; trade--) {
-    if (!OrderSelect(trade, SELECT_BY_POS, MODE_TRADES)) {
-      CheckError();
-    }
-    if (OrderSymbol() != Symbol() || OrderMagicNumber() != magic_number)
-      continue;
+    error = OrderSelect(trade, SELECT_BY_POS, MODE_TRADES);
     if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number)
       if (OrderType() == OP_SELL || OrderType() == OP_BUY) count++;
   }
@@ -15,33 +11,23 @@ int CountTrades() {
 
 void CloseThisSymbolAll() {
   for (int trade = OrdersTotal() - 1; trade >= 0; trade--) {
-    if (!OrderSelect(trade, SELECT_BY_POS, MODE_TRADES)) {
-      CheckError();
-    }
+    error = OrderSelect(trade, SELECT_BY_POS, MODE_TRADES);
     if (OrderSymbol() == Symbol()) {
       if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
         if (OrderType() == OP_BUY)
-          if (!OrderClose(OrderTicket(), OrderLots(), Bid, slip, Blue)) {
-            CheckError();
-          }
-        if (OrderType() == OP_SELL)
-          if (!OrderClose(OrderTicket(), OrderLots(), Ask, slip, Red)) {
-            CheckError();
-          }
+          error = OrderClose(OrderTicket(), OrderLots(), Bid, slip, Blue);
       }
-      Sleep(1000);
+      if (OrderType() == OP_SELL)
+        error = OrderClose(OrderTicket(), OrderLots(), Ask, slip, Red);
     }
+    Sleep(1000);
   }
 }
 
 double CalculateProfit() {
   double Profit = 0;
   for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
-    if (!OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES)) {
-      CheckError();
-    }
-    if (OrderSymbol() != Symbol() || OrderMagicNumber() != magic_number)
-      continue;
+    error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
     if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number)
       if (OrderType() == OP_BUY || OrderType() == OP_SELL)
         Profit += OrderProfit();
@@ -54,11 +40,7 @@ double FindLastBuyPrice() {
   int oldticketnumber;
   int ticketnumber = 0;
   for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
-    if (!OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES)) {
-      CheckError();
-    }
-    if (OrderSymbol() != Symbol() || OrderMagicNumber() != magic_number)
-      continue;
+    error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
     if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number &&
         OrderType() == OP_BUY) {
       oldticketnumber = OrderTicket();
@@ -76,11 +58,7 @@ double FindLastSellPrice() {
   int oldticketnumber;
   int ticketnumber = 0;
   for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
-    if (!OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES)) {
-      CheckError();
-    }
-    if (OrderSymbol() != Symbol() || OrderMagicNumber() != magic_number)
-      continue;
+    error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
     if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number &&
         OrderType() == OP_SELL) {
       oldticketnumber = OrderTicket();
@@ -93,15 +71,7 @@ double FindLastSellPrice() {
   return (oldorderopenprice);
 }
 
-double GetLots() {
-  return NormalizeDouble(lots * lot_multiplier, lotdecimal);
-}
-
-bool CheckError() {
-  int err = GetLastError();
-  if (err) Print("Error: " + err);
-  return (err);
-}
+double GetLots() { return NormalizeDouble(lots * lot_multiplier, lotdecimal); }
 
 double StopLong(double price, int stop) {
   if (stop == 0)
@@ -136,80 +106,96 @@ int OpenPendingOrder(int pType, double pLots, double pLevel, int sp, double pr,
                      color pColor) {
   int c = 0;
   int NumberOfTries = 100;
+
   switch (pType) {
     case 2:
       for (c = 0; c < NumberOfTries; c++) {
-        ticket = OrderSend(Symbol(), OP_BUYLIMIT, pLots, pLevel, sp,
-                           StopLong(pr, sl), TakeLong(pLevel, tp), pComment,
-                           pMagic, pDatetime, pColor);
-        if (!CheckError()) break;
+        error = OrderSend(Symbol(), OP_BUYLIMIT, pLots, pLevel, sp,
+                          StopLong(pr, sl), TakeLong(pLevel, tp), pComment,
+                          pMagic, pDatetime, pColor);
+        break;
       }
       break;
     case 4:
       for (c = 0; c < NumberOfTries; c++) {
-        ticket = OrderSend(Symbol(), OP_BUYSTOP, pLots, pLevel, sp,
-                           StopLong(pr, sl), TakeLong(pLevel, tp), pComment,
-                           pMagic, pDatetime, pColor);
-        if (!CheckError()) break;
+        error = OrderSend(Symbol(), OP_BUYSTOP, pLots, pLevel, sp,
+                          StopLong(pr, sl), TakeLong(pLevel, tp), pComment,
+                          pMagic, pDatetime, pColor);
+        break;
       }
       break;
     case 0:
       for (c = 0; c < NumberOfTries; c++) {
         RefreshRates();
-        ticket =
-            OrderSend(Symbol(), OP_BUY, pLots, NormalizeDouble(Ask, Digits), sp,
-                      NormalizeDouble(StopLong(Bid, sl), Digits),
-                      NormalizeDouble(TakeLong(Ask, tp), Digits), pComment,
-                      pMagic, pDatetime, pColor);
-        if (!CheckError()) break;
+        error = OrderSend(Symbol(), OP_BUY, pLots, NormalizeDouble(Ask, Digits),
+                          sp, NormalizeDouble(StopLong(Bid, sl), Digits),
+                          NormalizeDouble(TakeLong(Ask, tp), Digits), pComment,
+                          pMagic, pDatetime, pColor);
+        break;
       }
       break;
     case 3:
       for (c = 0; c < NumberOfTries; c++) {
-        ticket = OrderSend(Symbol(), OP_SELLLIMIT, pLots, pLevel, sp,
-                           StopShort(pr, sl), TakeShort(pLevel, tp), pComment,
-                           pMagic, pDatetime, pColor);
-        if (!CheckError()) break;
+        error = OrderSend(Symbol(), OP_SELLLIMIT, pLots, pLevel, sp,
+                          StopShort(pr, sl), TakeShort(pLevel, tp), pComment,
+                          pMagic, pDatetime, pColor);
+        break;
       }
       break;
     case 5:
       for (c = 0; c < NumberOfTries; c++) {
-        ticket = OrderSend(Symbol(), OP_SELLSTOP, pLots, pLevel, sp,
-                           StopShort(pr, sl), TakeShort(pLevel, tp), pComment,
-                           pMagic, pDatetime, pColor);
-        if (!CheckError()) break;
+        error = OrderSend(Symbol(), OP_SELLSTOP, pLots, pLevel, sp,
+                          StopShort(pr, sl), TakeShort(pLevel, tp), pComment,
+                          pMagic, pDatetime, pColor);
+        break;
       }
       break;
     case 1:
       for (c = 0; c < NumberOfTries; c++) {
-        ticket =
+        error =
             OrderSend(Symbol(), OP_SELL, pLots, NormalizeDouble(Bid, Digits),
                       sp, NormalizeDouble(StopShort(Ask, sl), Digits),
                       NormalizeDouble(TakeShort(Bid, tp), Digits), pComment,
                       pMagic, pDatetime, pColor);
-        if (!CheckError()) break;
+        break;
       }
   }
-  return (ticket);
+  return (error);
 }
 
 bool IsIndicatorHigh() {
-  if (iStochastic(NULL, 0, i_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 0) <
-          i_maximum &&
-      iStochastic(NULL, 0, i_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 1) >
-          i_maximum) {
-    return true;
+  if (strat == 0) {
+    if (iStochastic(NULL, 0, i_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 0) <
+            i_maximum &&
+        iStochastic(NULL, 0, i_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 1) >
+            i_maximum) {
+      return true;
+    }
+  }
+
+  if (strat == 1) {
+    if (iRSI(NULL, 0, i_period, PRICE_CLOSE, 0) > i_maximum) {
+      return true;
+    }
   }
 
   return false;
 }
 
 bool IsIndicatorLow() {
-  if (iStochastic(NULL, 0, i_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 0) >
-          i_minimum &&
-      iStochastic(NULL, 0, i_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 1) <
-          i_minimum) {
-    return true;
+  if (strat == 0) {
+    if (iStochastic(NULL, 0, i_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 0) >
+            i_minimum &&
+        iStochastic(NULL, 0, i_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 1) <
+            i_minimum) {
+      return true;
+    }
+  }
+
+  if (strat == 1) {
+    if (iRSI(NULL, 0, i_period, PRICE_CLOSE, 0) < i_minimum) {
+      return true;
+    }
   }
 
   return false;
