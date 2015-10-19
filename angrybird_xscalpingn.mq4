@@ -119,7 +119,7 @@ int start() {
     short_trade = FALSE;
     long_trade = FALSE;
     trade_now = FALSE;
-  
+
     if (IsIndicatorHigh()) {
       short_trade = TRUE;
       trade_now = TRUE;
@@ -128,7 +128,7 @@ int start() {
       long_trade = TRUE;
       trade_now = TRUE;
     }
-    
+
   } else if (total > 0) {
     if (short_trade && Bid > last_sell_price + 0.5)
       if (IsIndicatorHigh()) trade_now = TRUE;
@@ -140,7 +140,7 @@ int start() {
   if (trade_now) {
     i_lots = GetLots();
     num_of_trades = total;
-    
+
     if (short_trade) {
       error = OpenPendingOrder(OP_SELL, i_lots, Bid, slip, Ask, 0, 0, comment,
                                magic_number, 0, HotPink);
