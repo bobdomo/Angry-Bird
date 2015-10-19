@@ -93,7 +93,6 @@ int start() {
   Update();
   /* Exits if we haven't moved forward any bars */
   if (timeprev == Time[0]) return (0);
-  timeprev = Time[0];
 
   /* Alerts on error */
   if (error < 0) Alert("Error " + error);
@@ -150,6 +149,7 @@ int start() {
                                magic_number, 0, Lime);
     }
 
+    timeprev = Time[0];
     trade_now = FALSE;
     new_orders_placed = TRUE;
     last_buy_price = FindLastBuyPrice();
