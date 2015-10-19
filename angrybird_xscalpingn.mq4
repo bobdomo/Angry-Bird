@@ -26,7 +26,6 @@ extern double i_maximum = 80.0;
 extern double i_minimum = 20.0;
 extern double lots = 0.01;
 extern double takeprofit = 1300.0;
-extern int strat = 0;
 extern int i_period = 11;
 extern int exp_base = 3;
 
@@ -129,10 +128,10 @@ int start() {
     }
 
   } else if (total > 0) {
-    if (short_trade && Bid > last_sell_price + 0.5)
+    if (short_trade && Bid > last_sell_price + 0.1)
       if (IsIndicatorHigh()) trade_now = TRUE;
 
-    if (long_trade && Ask < last_buy_price - 0.5)
+    if (long_trade && Ask < last_buy_price - 0.1)
       if (IsIndicatorLow()) trade_now = TRUE;
   }
 

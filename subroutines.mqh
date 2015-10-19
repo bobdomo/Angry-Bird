@@ -164,39 +164,16 @@ int OpenPendingOrder(int pType, double pLots, double pLevel, int sp, double pr,
 }
 
 bool IsIndicatorHigh() {
-  if (strat == 0) {
-    if (iStochastic(NULL, 0, i_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 0) <
-            i_maximum &&
-        iStochastic(NULL, 0, i_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 1) >
-            i_maximum) {
-      return true;
-    }
-  }
-
-  if (strat == 1) {
-    if (iRSI(NULL, 0, i_period, PRICE_CLOSE, 0) > i_maximum) {
-      return true;
-    }
+  if (iRSI(NULL, 0, i_period, PRICE_CLOSE, 0) > i_maximum) {
+    return true;
   }
 
   return false;
 }
 
 bool IsIndicatorLow() {
-  if (strat == 0) {
-    if (iStochastic(NULL, 0, i_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 0) >
-            i_minimum &&
-        iStochastic(NULL, 0, i_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 1) <
-            i_minimum) {
-      return true;
-    }
+  if (iRSI(NULL, 0, i_period, PRICE_CLOSE, 0) < i_minimum) {
+    return true;
   }
-
-  if (strat == 1) {
-    if (iRSI(NULL, 0, i_period, PRICE_CLOSE, 0) < i_minimum) {
-      return true;
-    }
-  }
-
   return false;
 }
