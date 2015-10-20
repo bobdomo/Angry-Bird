@@ -168,14 +168,36 @@ bool IsIndicatorHigh() {
       iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, 1) > rsi_max) {
     return true;
   }
+  if (iStochastic(NULL, 0, stoch_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 0) < stoch_max &&
+      iStochastic(NULL, 0, stoch_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 1) > stoch_max) {
+   // return true;
+    }
 
   return false;
 }
 
 bool IsIndicatorLow() {
-  if (iRSI(NULL, 0, rsi_period, PRICE_MEDIAN, 0) > rsi_min &&
-      iRSI(NULL, 0, rsi_period, PRICE_MEDIAN, 1) < rsi_min) {
+  if (iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, 0) > rsi_min &&
+      iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, 1) < rsi_min) {
     return true;
+  }
+  if (iStochastic(NULL, 0, stoch_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 0) > stoch_min &&
+      iStochastic(NULL, 0, stoch_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 1) < stoch_min) {
+   // return true;
   }
   return false;
 }
+
+/*
+double  iStochastic(
+   string       symbol,           // symbol
+   int          timeframe,        // timeframe
+   int          Kperiod,          // K line period
+   int          Dperiod,          // D line period
+   int          slowing,          // slowing
+   int          method,           // averaging method
+   int          price_field,      // price (Low/High or Close/Close)
+   int          mode,             // line index
+   int          shift             // shift
+   );
+ */

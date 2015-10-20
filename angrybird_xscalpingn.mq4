@@ -18,37 +18,55 @@ int lotdecimal = 2;
 int magic_number = 2222;
 int num_of_trades = 0;
 int error = 0;
-int timeprev = 0;
 int total = 0;
+int time_difference = 0;
+int previous_time = 0;
 string name = "Ilan1.6";
 string comment = "";
-extern int rsi_max = 80.0;
-extern int rsi_min = 20.0;
-extern int rsi_period = 11;
+extern double rsi_max = 70.0;
+extern double rsi_min = 30.0;
+extern int rsi_period = 14;
+int stoch_max = 80.0;
+int stoch_min = 20.0;
+int stoch_period = 5;
+double short_lost = 0;
+double long_lost = 0;
+double lost_ratio = 0;
 extern double lots = 0.01;
 extern double takeprofit = 1300.0;
-extern double exp_base = 3;
+extern double exp_base = 2;
 
 int init() {
-  Update();
   last_buy_price = FindLastBuyPrice();
   last_sell_price = FindLastSellPrice();
-  return (0);
-}
-
-int deinit() { return (0); }
-
-void Update() {
-  buy_limit = Ask;
-  RefreshRates();
-  sell_limit = Bid;
   total = CountTrades();
-  comment = name + "-" + total;
+  Update();
 
-  /* ###TODO### */
+  /*###TODO###*/
+  for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
+    error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
+    if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
+      if (OrderType() == OP_BUY) {
+        long_trade = TRUE;
+        short_trade = FALSE;
+        long_lost = total - 1;
+        break;
+      }
+      if (OrderType() == OP_SELL) {
+        long_trade = FALSE;
+        short_trade = TRUE;
+        short_lost = total - 1;
+        break;
+      }
+    }
+  }
+  lost_ratio = short_lost - long_lost;
+  rsi_max = 70 + lost_ratio;
+  rsi_min = 30 + lost_ratio;
+
   average_price = 0;
   double Count = 0;
-  for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
+  for (cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
     error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
     if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
       average_price += OrderOpenPrice() * OrderLots();
@@ -56,6 +74,7 @@ void Update() {
     }
   }
   if (total > 0) average_price = NormalizeDouble(average_price / Count, Digits);
+
   for (cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
     error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
 
@@ -66,35 +85,54 @@ void Update() {
         price_target = average_price - takeprofit * Point;
     }
   }
-  /* ###TODO### */
 
-  if (long_trade) tp_dist = (price_target - Ask) / Point;
-  else if (short_trade) tp_dist = (Bid - price_target) / Point;
-  else tp_dist = 0;
+  return (0);
+}
+
+int deinit() { return (0); }
+
+void Update() {
+  buy_limit = Ask;
+  RefreshRates();
+  sell_limit = Bid;
+  comment = name + "-" + total;
+  time_difference = TimeCurrent() - Time[0];
+
+  if (long_trade)
+    tp_dist = (price_target - Bid) / Point;
+  else if (short_trade)
+    tp_dist = (Ask - price_target) / Point;
+  else
+    tp_dist = 0;
 
   if (tp_dist < takeprofit)
     lot_multiplier = 1;
   else
-    lot_multiplier = NormalizeDouble(MathPow(2, ((tp_dist * exp_base) / takeprofit) - exp_base), lotdecimal);
+    lot_multiplier = NormalizeDouble(
+        MathPow(exp_base, (tp_dist * total / takeprofit) - total), lotdecimal);
 
-  Comment(
-    "Distance to Take Profit: " + tp_dist +
-    "\nLot Multiplier: " + lot_multiplier +
-    "\nLast Buy: " + last_buy_price +
-    "\nLast Sell: " + last_sell_price +
-    "\nTrade Now: " + trade_now +
-    "\nShort Trade: " + short_trade +
-    "\nLong Trade: " + long_trade
-    );
+  Comment("Distance to Take Profit: " + tp_dist + "\nLot Multiplier: " +
+          lot_multiplier + "\nTime Difference: " + time_difference +
+          "\nShort Lost: " + short_lost + "\nLong Lost: " + long_lost +
+          "\nLost Ratio: " + lost_ratio + "\nRSI Max: " + rsi_max +
+          "\nRSI Min: " + rsi_min);
 }
 
 int start() {
   Update();
-  /* Exits if we haven't moved forward any bars */
-  if (timeprev == Time[0]) return (0);
+  /* Causes trading to wait a certain amount of time after a new bar opens */
+  if (IsTesting() || IsOptimization()) {
+    if (error < 0) return (0);
+    if (time_difference < 50 * 5) return (0);
+    if (previous_time == Time[0]) return (0);
+  } else {
+    if (time_difference < 59 * 5) return (0);
+  }
+
+  total = CountTrades();
 
   /* Alerts on error */
-  if (error < 0) Alert("Error " + error);
+  if (error < 0) Alert("Error " + GetLastError());
 
   /* Cycles through any open orders */
   for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
@@ -113,6 +151,7 @@ int start() {
     }
   }
 
+  /* Decides when we trade etc */
   if (total < 1) {
     short_trade = FALSE;
     long_trade = FALSE;
@@ -126,12 +165,22 @@ int start() {
       long_trade = TRUE;
       trade_now = TRUE;
     }
-  } else if (total > 0) {
-    if (short_trade && tp_dist > takeprofit)
-      if (IsIndicatorHigh()) trade_now = TRUE;
+  } else {
+    if (short_trade && Bid > last_sell_price)
+      if (IsIndicatorHigh()) {
+        trade_now = TRUE;
+        short_lost++;
+      }
 
-    if (long_trade && tp_dist > takeprofit)
-      if (IsIndicatorLow()) trade_now = TRUE;
+    if (long_trade && Ask < last_buy_price)
+      if (IsIndicatorLow()) {
+        trade_now = TRUE;
+        long_lost++;
+      }
+
+    lost_ratio = short_lost - long_lost;
+    rsi_max = 70 + lost_ratio;
+    rsi_min = 30 + lost_ratio;
   }
 
   if (trade_now) {
@@ -146,32 +195,35 @@ int start() {
       error = OpenPendingOrder(OP_BUY, i_lots, Ask, slip, Bid, 0, 0, comment,
                                magic_number, 0, Lime);
     }
-
-    timeprev = Time[0];
     trade_now = FALSE;
+
+    if (error < 0) return -1;
+
     new_orders_placed = TRUE;
+    total = CountTrades();
+    previous_time = Time[0];
     last_buy_price = FindLastBuyPrice();
     last_sell_price = FindLastSellPrice();
   }
 
   /******************************************************************************************/
   /******************************************************************************************/
-
-  Update();
-  average_price = 0;
-  double Count = 0;
-
-  for (cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
-    error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
-    if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
-      average_price += OrderOpenPrice() * OrderLots();
-      Count += OrderLots();
-    }
-  }
-
-  if (total > 0) average_price = NormalizeDouble(average_price / Count, Digits);
-
   if (new_orders_placed) {
+    Update();
+    average_price = 0;
+    double Count = 0;
+
+    for (cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
+      error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
+      if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
+        average_price += OrderOpenPrice() * OrderLots();
+        Count += OrderLots();
+      }
+    }
+
+    if (total > 0)
+      average_price = NormalizeDouble(average_price / Count, Digits);
+
     for (cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
       error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
 
