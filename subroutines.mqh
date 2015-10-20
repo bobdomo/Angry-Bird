@@ -164,7 +164,8 @@ int OpenPendingOrder(int pType, double pLots, double pLevel, int sp, double pr,
 }
 
 bool IsIndicatorHigh() {
-  if (iRSI(NULL, 0, i_period, PRICE_CLOSE, 0) > i_maximum) {
+  if (iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, 0) < rsi_max &&
+      iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, 1) > rsi_max) {
     return true;
   }
 
@@ -172,7 +173,8 @@ bool IsIndicatorHigh() {
 }
 
 bool IsIndicatorLow() {
-  if (iRSI(NULL, 0, i_period, PRICE_CLOSE, 0) < i_minimum) {
+  if (iRSI(NULL, 0, rsi_period, PRICE_MEDIAN, 0) > rsi_min &&
+      iRSI(NULL, 0, rsi_period, PRICE_MEDIAN, 1) < rsi_min) {
     return true;
   }
   return false;

@@ -22,11 +22,11 @@ int timeprev = 0;
 int total = 0;
 string name = "Ilan1.6";
 string comment = "";
-extern double i_maximum = 80.0;
-extern double i_minimum = 20.0;
+extern int rsi_max = 80.0;
+extern int rsi_min = 20.0;
+extern int rsi_period = 11;
 extern double lots = 0.01;
 extern double takeprofit = 1300.0;
-extern int i_period = 11;
 extern int exp_base = 3;
 
 int init() {
@@ -51,7 +51,7 @@ void Update() {
   for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
     error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
     if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
-      average_price += OrderOpenPrice() * OrderLots();
+      average_price += OrderClosePrice() * OrderLots();
       Count += OrderLots();
     }
   }
@@ -68,14 +68,14 @@ void Update() {
   }
   /* ###TODO### */
 
-  if (long_trade) tp_dist = (price_target - Ask) / Point;
-  else if (short_trade) tp_dist = (Bid - price_target) / Point;
+  if (long_trade) tp_dist = ((last_buy_price - Bid) / Point) + takeprofit;
+  else if (short_trade) tp_dist = ((Ask - last_sell_price) / Point) + takeprofit;
   else tp_dist = 0;
 
   if (tp_dist < takeprofit)
     lot_multiplier = 1;
   else
-    lot_multiplier = MathPow(exp_base, (tp_dist / takeprofit) - 1);
+    lot_multiplier = NormalizeDouble(MathPow(2, ((tp_dist * exp_base) / takeprofit) - exp_base), lotdecimal);
 
   Comment(
     "Distance to Take Profit: " + tp_dist +
@@ -126,7 +126,6 @@ int start() {
       long_trade = TRUE;
       trade_now = TRUE;
     }
-
   } else if (total > 0) {
     if (short_trade && Bid > last_sell_price + 0.1)
       if (IsIndicatorHigh()) trade_now = TRUE;
@@ -165,7 +164,7 @@ int start() {
   for (cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
     error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
     if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
-      average_price += OrderOpenPrice() * OrderLots();
+      average_price += OrderClosePrice() * OrderLots();
       Count += OrderLots();
     }
   }
