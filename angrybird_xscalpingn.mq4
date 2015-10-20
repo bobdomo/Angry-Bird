@@ -23,15 +23,13 @@ int time_difference = 0;
 int previous_time = 0;
 string name = "Ilan1.6";
 string comment = "";
-extern double rsi_max = 70.0;
-extern double rsi_min = 30.0;
+double rsi_max = 70.0;
+double rsi_min = 30.0;
 extern int rsi_period = 14;
 int stoch_max = 80.0;
 int stoch_min = 20.0;
 int stoch_period = 5;
-double short_lost = 0;
-double long_lost = 0;
-double lost_ratio = 0;
+double consec_losses = 0;
 extern double lots = 0.01;
 extern double takeprofit = 1300.0;
 extern double exp_base = 2;
@@ -49,20 +47,15 @@ int init() {
       if (OrderType() == OP_BUY) {
         long_trade = TRUE;
         short_trade = FALSE;
-        long_lost = total - 1;
         break;
       }
       if (OrderType() == OP_SELL) {
         long_trade = FALSE;
         short_trade = TRUE;
-        short_lost = total - 1;
         break;
       }
     }
   }
-  lost_ratio = short_lost - long_lost;
-  rsi_max = 70 + lost_ratio;
-  rsi_min = 30 + lost_ratio;
 
   average_price = 0;
   double Count = 0;
@@ -113,8 +106,7 @@ void Update() {
 
   Comment("Distance to Take Profit: " + tp_dist + "\nLot Multiplier: " +
           lot_multiplier + "\nTime Difference: " + time_difference +
-          "\nShort Lost: " + short_lost + "\nLong Lost: " + long_lost +
-          "\nLost Ratio: " + lost_ratio + "\nRSI Max: " + rsi_max +
+          "\nConsecutive Losses: " + consec_losses + "\nRSI Max: " + rsi_max +
           "\nRSI Min: " + rsi_min);
 }
 
@@ -156,6 +148,11 @@ int start() {
     short_trade = FALSE;
     long_trade = FALSE;
     trade_now = FALSE;
+    consec_losses = 0;
+    rsi_max = 70;
+    rsi_min = 30;
+    stoch_max = 80;
+    stoch_min = 20;
 
     if (IsIndicatorHigh()) {
       short_trade = TRUE;
@@ -166,24 +163,26 @@ int start() {
       trade_now = TRUE;
     }
   } else {
-    if (short_trade && Bid > last_sell_price)
+  rsi_max = 70 + consec_losses;
+  rsi_min = 30 + consec_losses;
+  stoch_max = 80 + consec_losses;
+  stoch_min = 20 + consec_losses;
+  
+    if (short_trade && Bid > last_sell_price + (takeprofit / 1) * Point)
       if (IsIndicatorHigh()) {
         trade_now = TRUE;
-        short_lost++;
+        consec_losses++;
       }
 
-    if (long_trade && Ask < last_buy_price)
+    if (long_trade && Ask < last_buy_price - (takeprofit / 1) * Point)
       if (IsIndicatorLow()) {
         trade_now = TRUE;
-        long_lost++;
+        consec_losses--;
       }
-
-    lost_ratio = short_lost - long_lost;
-    rsi_max = 70 + lost_ratio;
-    rsi_min = 30 + lost_ratio;
   }
 
   if (trade_now) {
+    
     i_lots = GetLots();
     num_of_trades = total;
 
