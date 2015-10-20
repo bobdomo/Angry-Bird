@@ -27,7 +27,7 @@ extern int rsi_min = 20.0;
 extern int rsi_period = 11;
 extern double lots = 0.01;
 extern double takeprofit = 1300.0;
-extern int exp_base = 3;
+extern double exp_base = 3;
 
 int init() {
   Update();
@@ -51,7 +51,7 @@ void Update() {
   for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
     error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
     if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
-      average_price += OrderClosePrice() * OrderLots();
+      average_price += OrderOpenPrice() * OrderLots();
       Count += OrderLots();
     }
   }
@@ -68,8 +68,8 @@ void Update() {
   }
   /* ###TODO### */
 
-  if (long_trade) tp_dist = ((last_buy_price - Bid) / Point) + takeprofit;
-  else if (short_trade) tp_dist = ((Ask - last_sell_price) / Point) + takeprofit;
+  if (long_trade) tp_dist = (price_target - Ask) / Point;
+  else if (short_trade) tp_dist = (Bid - price_target) / Point;
   else tp_dist = 0;
 
   if (tp_dist < takeprofit)
@@ -127,10 +127,10 @@ int start() {
       trade_now = TRUE;
     }
   } else if (total > 0) {
-    if (short_trade && Bid > last_sell_price + 0.1)
+    if (short_trade && tp_dist > takeprofit)
       if (IsIndicatorHigh()) trade_now = TRUE;
 
-    if (long_trade && Ask < last_buy_price - 0.1)
+    if (long_trade && tp_dist > takeprofit)
       if (IsIndicatorLow()) trade_now = TRUE;
   }
 
@@ -164,7 +164,7 @@ int start() {
   for (cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
     error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
     if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
-      average_price += OrderClosePrice() * OrderLots();
+      average_price += OrderOpenPrice() * OrderLots();
       Count += OrderLots();
     }
   }
