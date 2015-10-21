@@ -16,22 +16,34 @@ double slip = 3.0;
 double tp_dist = 0;
 int lotdecimal = 2;
 int magic_number = 2222;
-int num_of_trades = 0;
 int error = 0;
 int total = 0;
 int time_difference = 0;
 int previous_time = 0;
 string name = "Ilan1.6";
 string comment = "";
+extern double macd_fast_ma = 12;
+extern double macd_slow_ma = 26;
+extern double macd_accel = 0.3;
 extern double rsi_max = 70.0;
 extern double rsi_min = 30.0;
 extern int rsi_period = 14;
-int stoch_max = 80.0;
-int stoch_min = 20.0;
-int stoch_period = 5;
+extern double exp_base = 1;
 extern double lots = 0.01;
 extern double takeprofit = 1300.0;
-extern double exp_base = 2;
+
+int IndicatorSignal() {
+  if (iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, 0) > rsi_max &&
+      iMACD(NULL, 0, macd_fast_ma, macd_slow_ma, 9, PRICE_TYPICAL, MODE_MAIN, 0) > macd_accel) {
+    return OP_SELL;
+  }
+  if (iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, 0) < rsi_min &&
+      iMACD(NULL, 0, macd_fast_ma, macd_slow_ma, 9, PRICE_TYPICAL, MODE_MAIN, 0) < -macd_accel) {
+    return OP_BUY;
+  }
+
+  return -1;
+}
 
 int init() {
   last_buy_price = FindLastBuyPrice();
@@ -101,10 +113,11 @@ void Update() {
     lot_multiplier = 1;
   else
     lot_multiplier = NormalizeDouble(
-        MathPow(exp_base, (tp_dist * total / takeprofit) - total), lotdecimal);
+        MathPow(exp_base, (tp_dist * total / takeprofit)), lotdecimal);
 
   Comment("Distance to Take Profit: " + tp_dist + "\nLot Multiplier: " +
-          lot_multiplier + "\nTime Difference: " + time_difference);
+          lot_multiplier + "\nTime Difference: " + time_difference +
+          "\n Short Trade: " + short_trade + "\n Long Trade: " + long_trade);
 }
 
 int start() {
@@ -112,10 +125,11 @@ int start() {
   /* Causes trading to wait a certain amount of time after a new bar opens */
   if (IsTesting() || IsOptimization()) {
     if (error < 0) return (0);
-    if (time_difference < 50 * 5) return (0);
+    if (time_difference < 10 * 5) return (0);
     if (previous_time == Time[0]) return (0);
   } else {
-    if (time_difference < 59 * 5) return (0);
+    if (time_difference < 35 * 5) return (0);
+    if (previous_time == Time[0]) return (0);
   }
 
   total = CountTrades();
@@ -123,81 +137,59 @@ int start() {
   /* Alerts on error */
   if (error < 0) Alert("Error " + GetLastError());
 
-  /* Cycles through any open orders */
-  for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
-    error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
-    if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
-      if (OrderType() == OP_BUY) {
-        long_trade = TRUE;
-        short_trade = FALSE;
-        break;
-      }
-      if (OrderType() == OP_SELL) {
-        long_trade = FALSE;
-        short_trade = TRUE;
-        break;
-      }
-    }
-  }
-
-  /* Decides when we trade etc */
-  if (total < 1) {
-    short_trade = FALSE;
-    long_trade = FALSE;
-    trade_now = FALSE;
-
-    if (IsIndicatorHigh()) {
-      short_trade = TRUE;
-      trade_now = TRUE;
-    }
-    if (IsIndicatorLow()) {
-      long_trade = TRUE;
-      trade_now = TRUE;
-    }
-  } else {
-    if (short_trade && Bid > last_sell_price + (takeprofit / 1) * Point)
-      if (IsIndicatorHigh()) {
-        trade_now = TRUE;
-      }
-
-    if (long_trade && Ask < last_buy_price - (takeprofit / 1) * Point)
-      if (IsIndicatorLow()) {
-        trade_now = TRUE;
-      }
-  }
-
-  if (trade_now) {
-    
+  /* All the actions that occur when a trade is signaled */
+  if (IndicatorSignal() > -1) {
     i_lots = GetLots();
-    num_of_trades = total;
 
-    if (short_trade) {
-      error = OpenPendingOrder(OP_SELL, i_lots, Bid, slip, Ask, 0, 0, comment,
-                               magic_number, 0, HotPink);
+    if (total == 0) {
+      if (IndicatorSignal() == OP_BUY) {
+        long_trade = TRUE;
+        error = OpenPendingOrder(OP_BUY, i_lots, Ask, slip, Bid, 0, 0, comment,
+                                 magic_number, 0, Lime);
+        new_orders_placed = TRUE;
+      }
+      if (IndicatorSignal() == OP_SELL) {
+        short_trade = TRUE;
+        error = OpenPendingOrder(OP_SELL, i_lots, Bid, slip, Ask, 0, 0, comment,
+                                 magic_number, 0, HotPink);
+        new_orders_placed = TRUE;
+      }
+    } else {
+      if (short_trade && Bid > last_sell_price + (takeprofit / 1) * Point)
+        if (IndicatorSignal() == OP_SELL) {
+          error = OpenPendingOrder(OP_SELL, i_lots, Bid, slip, Ask, 0, 0,
+                                   comment, magic_number, 0, HotPink);
+          new_orders_placed = TRUE;
+        }
+      if (long_trade && Ask < last_buy_price - (takeprofit / 1) * Point)
+        if (IndicatorSignal() == OP_BUY) {
+          error = OpenPendingOrder(OP_BUY, i_lots, Ask, slip, Bid, 0, 0,
+                                   comment, magic_number, 0, Lime);
+
+          new_orders_placed = TRUE;
+        }
     }
-    if (long_trade) {
-      error = OpenPendingOrder(OP_BUY, i_lots, Ask, slip, Bid, 0, 0, comment,
-                               magic_number, 0, Lime);
-    }
-    trade_now = FALSE;
 
     if (error < 0) return -1;
-
-    new_orders_placed = TRUE;
     total = CountTrades();
-    previous_time = Time[0];
     last_buy_price = FindLastBuyPrice();
     last_sell_price = FindLastSellPrice();
+  } else {
+    if (total == 0) {
+      short_trade = FALSE;
+      long_trade = FALSE;
+    }
   }
 
   /******************************************************************************************/
   /******************************************************************************************/
   if (new_orders_placed) {
     Update();
+    previous_time = Time[0];
     average_price = 0;
     double Count = 0;
 
-    for (cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
+    for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
       error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
       if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
         average_price += OrderOpenPrice() * OrderLots();
