@@ -20,12 +20,14 @@ int total = 0;
 int time_difference = 0;
 int previous_time = 0;
 int tp_dist;
+int pipstep = 0;
 string name = "Ilan1.6";
 string comment = "";
-extern double rsi_max = 70.0;
-extern double rsi_min = 30.0;
+extern int rsi_max = 70.0;
+extern int rsi_min = 30.0;
 extern int rsi_period = 14;
 extern double lots = 0.01;
+extern double exp_base = 1;
 extern double takeprofit = 1300.0;
 
 int IndicatorSignal() {
@@ -95,16 +97,22 @@ void Update() {
     tp_dist = (price_target - Bid) / Point;
   else
     tp_dist = 0;
+    
+    pipstep = takeprofit * MathAbs(iMACD(NULL, 0, 12, 26, 9, PRICE_TYPICAL, MODE_MAIN, 0));
 
   if (total > 0)
-    lot_multiplier = NormalizeDouble(MathPow(1.2, (tp_dist * total / takeprofit)), lotdecimal);
+    lot_multiplier = NormalizeDouble(MathPow(exp_base, (tp_dist / takeprofit)), lotdecimal);
   else
     lot_multiplier = 1;
 
-  Comment("\nLot Multiplier: " + lot_multiplier + "\nTime Difference: " +
-          time_difference + "\nShort Trade: " + short_trade + "\nLong Trade: " +
-          long_trade + "\nPrice Target: " + price_target +
-          "\nDistance to Take Profit: " + tp_dist);
+  Comment(
+          "\nDistance to Take Profit: " + tp_dist +
+          "\nTime Difference: " + time_difference +
+          "\nLot Multiplier: " + lot_multiplier +
+          "\nPrice Target: "+ price_target +
+          "\nShort Trade: " + short_trade +
+          "\nLong Trade: " + long_trade + 
+          "\nPipstep: " + pipstep);
 }
 
 int start() {
@@ -152,13 +160,13 @@ int start() {
         new_orders_placed = TRUE;
       }
     } else {
-      if (short_trade && Bid > last_sell_price + (takeprofit / 1) * Point)
+      if (short_trade && Bid > last_sell_price + pipstep * Point)
         if (IndicatorSignal() == OP_SELL) {
           error = OpenPendingOrder(OP_SELL, i_lots, Bid, slip, Ask, 0, 0,
                                    comment, magic_number, 0, HotPink);
           new_orders_placed = TRUE;
         }
-      if (long_trade && Ask < last_buy_price - (takeprofit / 1) * Point)
+      if (long_trade && Ask < last_buy_price - pipstep * Point)
         if (IndicatorSignal() == OP_BUY) {
           error = OpenPendingOrder(OP_BUY, i_lots, Ask, slip, Bid, 0, 0,
                                    comment, magic_number, 0, Lime);
