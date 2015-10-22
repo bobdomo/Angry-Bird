@@ -43,50 +43,43 @@ int IndicatorSignal() {
 }
 
 int init() {
-  last_buy_price = FindLastBuyPrice();
-  last_sell_price = FindLastSellPrice();
-  total = CountTrades();
   Update();
 
   if (total) {
+    last_buy_price = FindLastBuyPrice();
+    last_sell_price = FindLastSellPrice();
     UpdateAveragePrice();
-
-    for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
-      error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
-      if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
-        if (OrderType() == OP_BUY) {
-          long_trade = TRUE;
-          short_trade = FALSE;
-          price_target = average_price + (takeprofit * Point);
-          break;
-        }
-        if (OrderType() == OP_SELL) {
-          long_trade = FALSE;
-          short_trade = TRUE;
-          price_target = average_price - (takeprofit * Point);
-          break;
-        }
-      }
-    }
+    UpdateOpenOrders();
   }
 
   return (0);
 }
 
-int deinit() { return (0); }
+int deinit() {
+  return (0);
+}
 
 void Update() {
   buy_limit = Ask;
-  RefreshRates();
   sell_limit = Bid;
-  comment = name + "-" + total;
   time_difference = TimeCurrent() - Time[0];
   total = CountTrades();
+  
+    /* Alerts on error */
+  if (error < 0) Alert("Error " + GetLastError());
+
+  /* Usually runs when orders are gone due to take profit */
+  if (total == 0) {
+    short_trade = FALSE;
+    long_trade = FALSE;
+    price_target = 0;
+    average_price = 0;
+  }
 
   if (short_trade)
-    tp_dist = (Ask - price_target) / Point;
+    tp_dist = (Bid - price_target) / Point;
   else if (long_trade)
-    tp_dist = (price_target - Bid) / Point;
+    tp_dist = (price_target - Ask) / Point;
   else
     tp_dist = 0;
 
@@ -115,23 +108,14 @@ int start() {
     if (error < 0) {
       return (0);
     }
-    Update();
-    if (time_difference < 10 * 5) return (0);
+    time_difference = TimeCurrent() - Time[0];
+    if (time_difference < 12 * 5) return (0);
     if (previous_time == Time[0]) return (0);
+    Update();
   } else {
     Update();
-    if (time_difference < 35 * 5) return (0);
+    if (time_difference < 50 * 5) return (0);
     if (previous_time == Time[0]) return (0);
-  }
-
-  /* Alerts on error */
-  if (error < 0) Alert("Error " + GetLastError());
-
-  /* Usually runs when orders are gone due to take profit */
-  if (total == 0) {
-    short_trade = FALSE;
-    long_trade = FALSE;
-    price_target = 0;
   }
 
   /* All the actions that occur when a trade is signaled */
@@ -179,24 +163,9 @@ int start() {
   if (new_orders_placed) {
     Update();
     UpdateAveragePrice();
-    previous_time = Time[0];
-
-    for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
-      error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
-
-      if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
-        if (OrderType() == OP_BUY)
-          price_target = average_price + (takeprofit * Point);
-        if (OrderType() == OP_SELL)
-          price_target = average_price - (takeprofit * Point);
-
-        error = OrderModify(OrderTicket(), NULL,
-                            NormalizeDouble(OrderStopLoss(), Digits),
-                            NormalizeDouble(price_target, Digits), 0, Yellow);
-      }
-    }
-
+    UpdateOpenOrders();
     new_orders_placed = FALSE;
+    previous_time = Time[0];
   }
 
   return (0);
@@ -220,4 +189,25 @@ void UpdateAveragePrice() {
   average_price = NormalizeDouble(average_price / count, Digits);
 }
 
-void UpdateOpenOrders() {}
+void UpdateOpenOrders() {
+    for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
+      error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
+
+      if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
+        if (OrderType() == OP_BUY) {
+          price_target = average_price + (takeprofit * Point);
+          short_trade = FALSE;
+          long_trade = TRUE;
+        }
+        if (OrderType() == OP_SELL) {
+          price_target = average_price - (takeprofit * Point);
+          short_trade = TRUE;
+          long_trade = FALSE;
+        }
+
+        error = OrderModify(OrderTicket(), NULL,
+                            NormalizeDouble(OrderStopLoss(), Digits),
+                            NormalizeDouble(price_target, Digits), 0, Yellow);
+      }
+    }
+}
