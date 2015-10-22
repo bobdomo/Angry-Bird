@@ -1,3 +1,4 @@
+
 #include "subroutines.mqh"
 
 bool long_trade = FALSE;
@@ -48,18 +49,9 @@ int init() {
   Update();
 
   if (total) {
-    average_price = 0;
-    double Count = 0;
-    for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
-      error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
-      if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
-        average_price += OrderOpenPrice() * OrderLots();
-        Count += OrderLots();
-      }
-    }
-    average_price = NormalizeDouble(average_price / Count, Digits);
+    UpdateAveragePrice();
 
-    for (cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
+    for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
       error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
       if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
         if (OrderType() == OP_BUY) {
@@ -97,7 +89,7 @@ void Update() {
     tp_dist = (price_target - Bid) / Point;
   else
     tp_dist = 0;
-    
+
     pipstep = takeprofit * MathAbs(iMACD(NULL, 0, 12, 26, 9, PRICE_TYPICAL, MODE_MAIN, 0));
 
   if (total > 0)
@@ -106,13 +98,15 @@ void Update() {
     lot_multiplier = 1;
 
   Comment(
-          "\nDistance to Take Profit: " + tp_dist +
-          "\nTime Difference: " + time_difference +
-          "\nLot Multiplier: " + lot_multiplier +
-          "\nPrice Target: "+ price_target +
+          "\nPipstep: " + pipstep +
+          "\nLong Trade: " + long_trade +
           "\nShort Trade: " + short_trade +
-          "\nLong Trade: " + long_trade + 
-          "\nPipstep: " + pipstep);
+          "\nPrice Target: " + price_target +
+          "\nLot Multiplier: " + lot_multiplier +
+          "\nAverage Price: " + average_price +
+          "\nTime Difference: " + time_difference +
+          "\nDistance to Take Profit: " + tp_dist
+          );
 }
 
 int start() {
@@ -184,20 +178,10 @@ int start() {
   /******************************************************************************************/
   if (new_orders_placed) {
     Update();
+    UpdateAveragePrice();
     previous_time = Time[0];
 
-    average_price = 0;
-    double Count = 0;
     for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
-      error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
-      if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
-        average_price += OrderOpenPrice() * OrderLots();
-        Count += OrderLots();
-      }
-    }
-    average_price = NormalizeDouble(average_price / Count, Digits);
-
-    for (cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
       error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
 
       if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
@@ -217,3 +201,23 @@ int start() {
 
   return (0);
 }
+
+void UpdateAveragePrice() {
+  average_price = 0;
+  double count = 0;
+
+  for (int i = 0; i < total; ++i) {
+    error = OrderSelect(i, SELECT_BY_POS, MODE_TRADES);
+
+    if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
+      average_price += OrderOpenPrice() * OrderLots();
+      count += OrderLots();
+    }
+  }
+
+  average_price = average_price / total;
+  count = count / total;
+  average_price = NormalizeDouble(average_price / count, Digits);
+}
+
+void UpdateOpenOrders() {}
