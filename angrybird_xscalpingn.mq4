@@ -27,7 +27,9 @@ extern int rsi_min = 30.0;
 extern int rsi_period = 14;
 extern double lots = 0.01;
 extern double exp_base = 1;
+extern double commission = 0.0025;
 extern double takeprofit = 1300.0;
+double i_takeprofit = 0;
 
 int init() {
   Update();
@@ -48,10 +50,10 @@ int start() {
   /* Causes trading to wait a certain amount of time after a new bar opens */
   if (IsTesting() || IsOptimization()) {
     if (error < 0) {
-      if (AccountFreeMargin() > 50) {
-        OrderSend(Symbol(), OP_BUY, AccountBalance() * 1.5 / Ask, Ask, slip, 0,
+      if (AccountFreeMargin() > 10) {
+        OrderSend(Symbol(), OP_BUY, 0.1, Ask, slip, 0,
                   0, 0, magic_number, 0, 0);
-        OrderSend(Symbol(), OP_SELL, AccountBalance() * 1.5 / Bid, Bid, slip, 0,
+        OrderSend(Symbol(), OP_SELL, 0.1, Bid, slip, 0,
                   0, 0, magic_number, 0, 0);
       }
       return (0);
@@ -72,30 +74,28 @@ int start() {
     i_lots = NormalizeDouble(lots * lot_multiplier, lotdecimal);
 
     if (total == 0) {
-      /* Usually runs when orders are gone due to take profit */
-      short_trade = FALSE;
-      long_trade = FALSE;
-      price_target = 0;
-      average_price = 0;
-
       if (IndicatorSignal() == OP_BUY) {
         long_trade = TRUE;
-        error = OrderSend(Symbol(), OP_BUY, i_lots, Ask, slip, 0, 0, name, magic_number, 0, clrLimeGreen);
+        error = OrderSend(Symbol(), OP_BUY, i_lots, Ask, slip, 0, 0, name,
+                          magic_number, 0, clrLimeGreen);
       }
       if (IndicatorSignal() == OP_SELL) {
         short_trade = TRUE;
-        error = OrderSend(Symbol(), OP_SELL, i_lots, Bid, slip, 0, 0, name, magic_number, 0, clrHotPink);
+        error = OrderSend(Symbol(), OP_SELL, i_lots, Bid, slip, 0, 0, name,
+                          magic_number, 0, clrHotPink);
       }
       new_orders_placed = TRUE;
     } else {
       if (short_trade && Bid > last_sell_price + pipstep * Point)
         if (IndicatorSignal() == OP_SELL) {
-          error = OrderSend(Symbol(), OP_SELL, i_lots, Bid, slip, 0, 0, name, magic_number, 0, clrHotPink);
+          error = OrderSend(Symbol(), OP_SELL, i_lots, Bid, slip, 0, 0, name,
+                            magic_number, 0, clrHotPink);
           new_orders_placed = TRUE;
         }
       if (long_trade && Ask < last_buy_price - pipstep * Point)
         if (IndicatorSignal() == OP_BUY) {
-          error = OrderSend(Symbol(), OP_BUY, i_lots, Ask, slip, 0, 0, name, magic_number, 0, clrLimeGreen);
+          error = OrderSend(Symbol(), OP_BUY, i_lots, Ask, slip, 0, 0, name,
+                            magic_number, 0, clrLimeGreen);
           new_orders_placed = TRUE;
         }
     }
@@ -122,22 +122,34 @@ void Update() {
   time_difference = TimeCurrent() - Time[0];
   total = CountTrades();
 
+  /* Usually runs when orders are gone due to take profit */
+  if (total == 0) {
+    short_trade = FALSE;
+    long_trade = FALSE;
+    price_target = 0;
+    average_price = 0;
+  }
+
   /* Alerts on error */
   if (error < 0) Alert("Error " + GetLastError());
 
-  if (short_trade)
+  if (short_trade) {
     tp_dist = (Bid - price_target) / Point;
-  else if (long_trade)
+  }
+  else if (long_trade) {
     tp_dist = (price_target - Ask) / Point;
+  }
   else
     tp_dist = 0;
 
-  pipstep = takeprofit *
+  i_takeprofit = takeprofit + ((Bid * commission) / Point);
+
+  pipstep = i_takeprofit *
             MathAbs(iMACD(NULL, 0, 12, 26, 9, PRICE_TYPICAL, MODE_MAIN, 0));
 
   if (total > 0)
     lot_multiplier =
-        NormalizeDouble(MathPow(exp_base, (tp_dist / takeprofit)), lotdecimal);
+        NormalizeDouble(MathPow(exp_base, (tp_dist / i_takeprofit)), lotdecimal);
   else
     lot_multiplier = 1;
 
@@ -149,6 +161,7 @@ void Update() {
           "\nLot Multiplier: " + lot_multiplier +
           "\nTime passed: " + time_difference +
           "\nAverage Price: " + average_price +
+          "\nTake Profit: " + i_takeprofit +
           "\nTake Profit Distance: " + tp_dist
           );
 }
@@ -177,12 +190,12 @@ void UpdateOpenOrders() {
 
     if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
       if (OrderType() == OP_BUY) {
-        price_target = average_price + (takeprofit * Point);
+        price_target = average_price + (i_takeprofit * Point);
         short_trade = FALSE;
         long_trade = TRUE;
       }
       if (OrderType() == OP_SELL) {
-        price_target = average_price - (takeprofit * Point);
+        price_target = average_price - (i_takeprofit * Point);
         short_trade = TRUE;
         long_trade = FALSE;
       }
