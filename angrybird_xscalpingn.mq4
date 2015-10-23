@@ -28,7 +28,8 @@ extern int rsi_period = 14;
 extern double lots = 0.01;
 extern double exp_base = 1;
 extern double commission = 0.005;
-double takeprofit = 0;
+extern double takeprofit = 1000;
+double i_takeprofit = 0;
 
 int init() {
   Update();
@@ -141,14 +142,14 @@ void Update() {
   else
     tp_dist = 0;
 
-  takeprofit = (Bid * commission) / Point;
+  i_takeprofit = takeprofit + (Bid * commission) / Point;
 
-  pipstep = takeprofit *
+  pipstep = i_takeprofit *
             MathAbs(iMACD(NULL, 0, 12, 26, 9, PRICE_TYPICAL, MODE_MAIN, 0));
 
   if (total > 0)
     lot_multiplier =
-        NormalizeDouble(MathPow(exp_base, (tp_dist / takeprofit)), lotdecimal);
+        NormalizeDouble(MathPow(exp_base, (tp_dist / i_takeprofit)), lotdecimal);
   else
     lot_multiplier = 1;
 
@@ -160,7 +161,7 @@ void Update() {
           "\nLot Multiplier: " + lot_multiplier +
           "\nTime passed: " + time_difference +
           "\nAverage Price: " + average_price +
-          "\nTake Profit: " + takeprofit +
+          "\nTake Profit: " + i_takeprofit +
           "\nTake Profit Distance: " + tp_dist
           );
 }
@@ -189,12 +190,12 @@ void UpdateOpenOrders() {
 
     if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
       if (OrderType() == OP_BUY) {
-        price_target = average_price + (takeprofit * Point);
+        price_target = average_price + (i_takeprofit * Point);
         short_trade = FALSE;
         long_trade = TRUE;
       }
       if (OrderType() == OP_SELL) {
-        price_target = average_price - (takeprofit * Point);
+        price_target = average_price - (i_takeprofit * Point);
         short_trade = TRUE;
         long_trade = FALSE;
       }
