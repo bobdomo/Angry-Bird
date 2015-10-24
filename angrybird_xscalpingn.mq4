@@ -143,7 +143,7 @@ void Update() {
   i_takeprofit = NormalizeDouble(takeprofit + (Bid * commission) / Point, 0);
 
   pipstep = i_takeprofit *
-            MathAbs(1 / iMACD(NULL, 0, macd_fast, macd_slow, 9, PRICE_TYPICAL, MODE_MAIN, 0));
+            MathAbs(iMACD(NULL, 0, macd_fast, macd_slow, 9, PRICE_TYPICAL, MODE_MAIN, 0));
 
   if (total > 0)
     lot_multiplier =
