@@ -2,7 +2,6 @@
 #include "subroutines.mqh"
 
 bool long_trade = FALSE;
-bool new_orders_placed = FALSE;
 bool short_trade = FALSE;
 bool trade_now = FALSE;
 double i_lots = 0;
@@ -52,7 +51,7 @@ int start() {
   /* Causes trading to wait a certain amount of time after a new bar opens */
   if (IsTesting() || IsOptimization()) {
     if (error < 0) {
-      if (AccountFreeMargin() > 10) {
+      if (AccountFreeMargin() > 20) {
         OrderSend(Symbol(), OP_BUY, 0.1, Ask, slip, 0,
                   0, 0, magic_number, 0, 0);
         OrderSend(Symbol(), OP_SELL, 0.1, Bid, slip, 0,
@@ -86,38 +85,35 @@ int start() {
         error = OrderSend(Symbol(), OP_SELL, i_lots, Bid, slip, 0, 0, name,
                           magic_number, 0, clrHotPink);
       }
-      new_orders_placed = TRUE;
+      NewOrdersPlaced();
     } else {
       if (short_trade && Bid > last_sell_price + pipstep * Point)
         if (IndicatorSignal() == OP_SELL) {
           error = OrderSend(Symbol(), OP_SELL, i_lots, Bid, slip, 0, 0, name,
                             magic_number, 0, clrHotPink);
-          new_orders_placed = TRUE;
+          NewOrdersPlaced();
         }
       if (long_trade && Ask < last_buy_price - pipstep * Point)
         if (IndicatorSignal() == OP_BUY) {
           error = OrderSend(Symbol(), OP_BUY, i_lots, Ask, slip, 0, 0, name,
                             magic_number, 0, clrLimeGreen);
-          new_orders_placed = TRUE;
+          NewOrdersPlaced();
         }
     }
-
-    if (error < 0) return (0);
-    last_buy_price = FindLastBuyPrice();
-    last_sell_price = FindLastSellPrice();
-    total = CountTrades();
-  }
-
-  /******************************************************************************************/
-  /******************************************************************************************/
-  if (new_orders_placed) {
-    UpdateAveragePrice();
-    UpdateOpenOrders();
-    new_orders_placed = FALSE;
-    previous_time = Time[0];
   }
 
   return (0);
+}
+
+void NewOrdersPlaced() {
+  if (error < 0) return (0);
+
+  previous_time = Time[0];
+  last_buy_price = FindLastBuyPrice();
+  last_sell_price = FindLastSellPrice();
+  total = CountTrades();
+  UpdateAveragePrice();
+  UpdateOpenOrders();
 }
 
 void Update() {
@@ -147,7 +143,7 @@ void Update() {
   i_takeprofit = NormalizeDouble(takeprofit + (Bid * commission) / Point, 0);
 
   pipstep = i_takeprofit *
-            MathAbs(iMACD(NULL, 0, macd_fast, macd_slow, 9, PRICE_TYPICAL, MODE_MAIN, 0));
+            MathAbs(1 / iMACD(NULL, 0, macd_fast, macd_slow, 9, PRICE_TYPICAL, MODE_MAIN, 0));
 
   if (total > 0)
     lot_multiplier =
