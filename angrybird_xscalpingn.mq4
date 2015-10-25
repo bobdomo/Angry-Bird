@@ -24,12 +24,19 @@ string comment = "";
 extern int rsi_max = 70.0;
 extern int rsi_min = 30.0;
 extern int rsi_period = 14;
+extern int rsi_ma = 3;
+double rsi_ma_result;
+/*
+extern int stoch_max = 80.0;
+extern int stoch_min = 20.0;
+extern int stoch_period = 5;
+*/
 extern int macd_fast = 3;
-extern int macd_slow = 26;
+int macd_slow = 26;
 extern double lots = 0.01;
-extern double exp_base = 1;
-extern double commission = 0.005;
-extern double takeprofit = 1000;
+extern double exp_base = 1.3;
+extern double commission = 0.0055;
+extern double takeprofit = 0;
 double i_takeprofit = 0;
 
 int init() {
@@ -49,7 +56,7 @@ int deinit() { return (0); }
 
 int start() {
   /* Causes trading to wait a certain amount of time after a new bar opens */
-  if (IsTesting() || IsOptimization()) {
+  if (IsOptimization() || IsTesting()) {
     if (error < 0) {
       if (AccountFreeMargin() > 20) {
         OrderSend(Symbol(), OP_BUY, 0.1, Ask, slip, 0,
@@ -61,10 +68,11 @@ int start() {
     }
 
     time_difference = TimeCurrent() - Time[0];
-    if (time_difference < 12 * 5) return (0);
+    if (time_difference < 24 * 5) return (0);
     if (previous_time == Time[0]) return (0);
     Update();
   } else {
+    if (error < 0) return (0);
     Update();
     if (time_difference < 50 * 5) return (0);
     if (previous_time == Time[0]) return (0);
@@ -153,14 +161,12 @@ void Update() {
 
   Comment(
           "\nPipstep: " + pipstep +
-          "\nLong Trade: " + long_trade +
-          "\nShort Trade: " + short_trade +
-          "\nPrice Target: " + price_target +
           "\nLot Multiplier: " + lot_multiplier +
           "\nTime passed: " + time_difference +
           "\nAverage Price: " + average_price +
           "\nTake Profit: " + i_takeprofit +
-          "\nTake Profit Distance: " + tp_dist
+          "\nTake Profit Distance: " + tp_dist +
+          "\nRSI MA: " + rsi_ma_result
           );
 }
 
@@ -188,12 +194,14 @@ void UpdateOpenOrders() {
 
     if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
       if (OrderType() == OP_BUY) {
-        price_target = NormalizeDouble(average_price + (i_takeprofit * Point), Digits);
+        price_target =
+            NormalizeDouble(average_price + (i_takeprofit * Point), Digits);
         short_trade = FALSE;
         long_trade = TRUE;
       }
       if (OrderType() == OP_SELL) {
-        price_target = NormalizeDouble(average_price - (i_takeprofit * Point), Digits);
+        price_target =
+            NormalizeDouble(average_price - (i_takeprofit * Point), Digits);
         short_trade = TRUE;
         long_trade = FALSE;
       }
@@ -206,7 +214,24 @@ void UpdateOpenOrders() {
 }
 
 int IndicatorSignal() {
-  if (iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, 0) > rsi_max) return OP_SELL;
-  if (iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, 0) < rsi_min) return OP_BUY;
+  rsi_ma_result = 0;
+  for (int i = 0; i < rsi_ma; i++) {
+    rsi_ma_result += iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, i);
+  }
+  
+  rsi_ma_result = rsi_ma_result / rsi_ma;
+
+  if (rsi_ma_result > rsi_max)
+    return OP_SELL;
+  if (rsi_ma_result < rsi_min)
+    return OP_BUY;
+    /*
+  if (iStochastic(NULL, 0, stoch_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 0) < stoch_max &&
+      iStochastic(NULL, 0, stoch_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 1) > stoch_max)
+    return OP_SELL;
+  if (iStochastic(NULL, 0, stoch_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 0) > stoch_min &&
+      iStochastic(NULL, 0, stoch_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 1) < stoch_min)
+    return OP_BUY;
+    */
   return (-1);
 }
