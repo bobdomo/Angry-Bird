@@ -21,12 +21,12 @@ int tp_dist;
 int pipstep = 0;
 string name = "Ilan1.6";
 string comment = "";
-extern int rsi_max = 70.0;
+extern int rsi_max = 90.0;
 extern int rsi_min = 30.0;
-extern int rsi_period = 14;
-extern int rsi_ma = 3;
+extern int rsi_period = 5;
 double rsi_ma_result;
 /*
+extern int rsi_ma = 3;
 extern int stoch_max = 80.0;
 extern int stoch_min = 20.0;
 extern int stoch_period = 5;
@@ -58,17 +58,17 @@ int start() {
   /* Causes trading to wait a certain amount of time after a new bar opens */
   if (IsOptimization() || IsTesting()) {
     if (error < 0) {
-      if (AccountFreeMargin() > 20) {
+      while (AccountFreeMargin() > 20) {
         OrderSend(Symbol(), OP_BUY, 0.1, Ask, slip, 0,
                   0, 0, magic_number, 0, 0);
         OrderSend(Symbol(), OP_SELL, 0.1, Bid, slip, 0,
                   0, 0, magic_number, 0, 0);
       }
-      return (0);
+      ExpertRemove();
     }
 
     time_difference = TimeCurrent() - Time[0];
-    if (time_difference < 24 * 5) return (0);
+    if (time_difference < 30 * 5) return (0);
     if (previous_time == Time[0]) return (0);
     Update();
   } else {
@@ -148,14 +148,13 @@ void Update() {
   else
     tp_dist = 0;
 
-  i_takeprofit = NormalizeDouble(takeprofit + (Bid * commission) / Point, 0);
+  i_takeprofit = takeprofit + (Bid * commission) / Point;
 
   pipstep = i_takeprofit *
             MathAbs(iMACD(NULL, 0, macd_fast, macd_slow, 9, PRICE_TYPICAL, MODE_MAIN, 0));
 
   if (total > 0)
-    lot_multiplier =
-        NormalizeDouble(MathPow(exp_base, (tp_dist * total / i_takeprofit)), lotdecimal);
+    lot_multiplier = MathPow(exp_base, (tp_dist * total / i_takeprofit));
   else
     lot_multiplier = 1;
 
@@ -165,8 +164,7 @@ void Update() {
           "\nTime passed: " + time_difference +
           "\nAverage Price: " + average_price +
           "\nTake Profit: " + i_takeprofit +
-          "\nTake Profit Distance: " + tp_dist +
-          "\nRSI MA: " + rsi_ma_result
+          "\nTake Profit Distance: " + tp_dist
           );
 }
 
@@ -214,16 +212,16 @@ void UpdateOpenOrders() {
 }
 
 int IndicatorSignal() {
+/*
   rsi_ma_result = 0;
   for (int i = 0; i < rsi_ma; i++) {
     rsi_ma_result += iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, i);
   }
-  
   rsi_ma_result = rsi_ma_result / rsi_ma;
-
-  if (rsi_ma_result > rsi_max)
+*/
+  if (iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, 0) > rsi_max)
     return OP_SELL;
-  if (rsi_ma_result < rsi_min)
+  if (iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, 0) < rsi_min)
     return OP_BUY;
     /*
   if (iStochastic(NULL, 0, stoch_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 0) < stoch_max &&
