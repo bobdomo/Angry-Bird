@@ -25,8 +25,8 @@ extern int rsi_max = 90.0;
 extern int rsi_min = 30.0;
 extern int rsi_period = 5;
 double rsi_ma_result;
-/*
 extern int rsi_ma = 3;
+/*
 extern int stoch_max = 80.0;
 extern int stoch_min = 20.0;
 extern int stoch_period = 5;
@@ -157,6 +157,13 @@ void Update() {
     lot_multiplier = MathPow(exp_base, (tp_dist * total / i_takeprofit));
   else
     lot_multiplier = 1;
+    
+  rsi_ma_result = 0;
+  for (int i = 0; i < rsi_ma; i++) {
+    rsi_ma_result += iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, i);
+  }
+  rsi_ma_result = rsi_ma_result / rsi_ma;
+    
 
   Comment(
           "\nPipstep: " + pipstep +
@@ -164,7 +171,8 @@ void Update() {
           "\nTime passed: " + time_difference +
           "\nAverage Price: " + average_price +
           "\nTake Profit: " + i_takeprofit +
-          "\nTake Profit Distance: " + tp_dist
+          "\nTake Profit Distance: " + tp_dist +
+          "\nRSI MA: " + rsi_ma_result
           );
 }
 
@@ -211,18 +219,17 @@ void UpdateOpenOrders() {
   }
 }
 
-int IndicatorSignal() {
-/*
-  rsi_ma_result = 0;
-  for (int i = 0; i < rsi_ma; i++) {
-    rsi_ma_result += iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, i);
-  }
-  rsi_ma_result = rsi_ma_result / rsi_ma;
-*/
+int IndicatorSignal() {  
+  if (rsi_ma_result > rsi_max)
+    return OP_SELL;
+  if (rsi_ma_result < rsi_min)
+    return OP_BUY;
+  /*
   if (iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, 0) > rsi_max)
     return OP_SELL;
   if (iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, 0) < rsi_min)
     return OP_BUY;
+    */
     /*
   if (iStochastic(NULL, 0, stoch_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 0) < stoch_max &&
       iStochastic(NULL, 0, stoch_period, 3, 3, MODE_SMA, 0, MODE_MAIN, 1) > stoch_max)
