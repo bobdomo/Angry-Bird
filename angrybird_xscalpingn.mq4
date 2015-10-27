@@ -21,20 +21,18 @@ int tp_dist;
 int pipstep = 0;
 string name = "Ilan1.6";
 string comment = "";
-extern int rsi_max = 90.0;
-extern int rsi_min = 30.0;
-extern int rsi_period = 5;
-double rsi_ma_result;
-extern int rsi_ma = 3;
+extern int rsi_max = 85.0;
+extern int rsi_min = 40.0;
+extern int rsi_period = 12;
 /*
 extern int stoch_max = 80.0;
 extern int stoch_min = 20.0;
 extern int stoch_period = 5;
 */
 extern int macd_fast = 3;
-int macd_slow = 26;
+extern int macd_slow = 26;
 extern double lots = 0.01;
-extern double exp_base = 1.3;
+extern double exp_base = 1.5;
 extern double commission = 0.0055;
 extern double takeprofit = 0;
 double i_takeprofit = 0;
@@ -67,10 +65,12 @@ int start() {
       ExpertRemove();
     }
 
+    if (!IsOptimization()) Update();
+
     time_difference = TimeCurrent() - Time[0];
     if (time_difference < 30 * 5) return (0);
     if (previous_time == Time[0]) return (0);
-    Update();
+
   } else {
     if (error < 0) return (0);
     Update();
@@ -80,6 +80,10 @@ int start() {
 
   /* All the actions that occur when a trade is signaled */
   if (IndicatorSignal() > -1) {
+    if (IsOptimization() || IsTesting()) {
+      Update();
+    }
+
     i_lots = NormalizeDouble(lots * lot_multiplier, lotdecimal);
 
     if (total == 0) {
@@ -107,6 +111,22 @@ int start() {
                             magic_number, 0, clrLimeGreen);
           NewOrdersPlaced();
         }
+      if (short_trade && IndicatorSignal() == OP_BUY && Bid > last_sell_price + pipstep * Point) {
+        CloseThisSymbolAll();
+        error = OrderSend(Symbol(), OP_BUY, i_lots, Ask, slip, 0, 0, name,
+                            magic_number, 0, clrLimeGreen);
+          short_trade = FALSE;
+          long_trade = TRUE;
+          NewOrdersPlaced();
+      }
+      if (long_trade && IndicatorSignal() == OP_SELL && Ask < last_buy_price - pipstep * Point) {
+        CloseThisSymbolAll();
+        error = OrderSend(Symbol(), OP_SELL, i_lots, Bid, slip, 0, 0, name,
+                          magic_number, 0, clrHotPink);
+        short_trade = TRUE;
+        long_trade = FALSE;
+        NewOrdersPlaced();
+      }
     }
   }
 
@@ -157,23 +177,17 @@ void Update() {
     lot_multiplier = MathPow(exp_base, (tp_dist * total / i_takeprofit));
   else
     lot_multiplier = 1;
-    
-  rsi_ma_result = 0;
-  for (int i = 0; i < rsi_ma; i++) {
-    rsi_ma_result += iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, i);
-  }
-  rsi_ma_result = rsi_ma_result / rsi_ma;
-    
 
-  Comment(
-          "\nPipstep: " + pipstep +
-          "\nLot Multiplier: " + lot_multiplier +
-          "\nTime passed: " + time_difference +
-          "\nAverage Price: " + average_price +
-          "\nTake Profit: " + i_takeprofit +
-          "\nTake Profit Distance: " + tp_dist +
-          "\nRSI MA: " + rsi_ma_result
-          );
+      Comment(
+            "\nPipstep: " + pipstep +
+            "\nLot Multiplier: " + lot_multiplier +
+            "\nTime passed: " + time_difference +
+            "\nShort Trade: " + short_trade +
+            "\nLong Trade: " + long_trade +
+            "\nAverage Price: " + average_price +
+            "\nTake Profit: " + i_takeprofit +
+            "\nTake Profit Distance: " + tp_dist
+            );
 }
 
 void UpdateAveragePrice() {
@@ -219,12 +233,18 @@ void UpdateOpenOrders() {
   }
 }
 
-int IndicatorSignal() {  
-  if (rsi_ma_result > rsi_max)
+int IndicatorSignal() {
+  if (iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, 0) > rsi_max)
     return OP_SELL;
-  if (rsi_ma_result < rsi_min)
+  if (iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, 0) < rsi_min)
     return OP_BUY;
+
   /*
+  if (rsi_ma_result < rsi_max && rsi_ma_result_prev > rsi_max)
+    return OP_SELL;
+  if (rsi_ma_result > rsi_min && rsi_ma_result_prev < rsi_min)
+    return OP_BUY;
+
   if (iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, 0) > rsi_max)
     return OP_SELL;
   if (iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, 0) < rsi_min)
