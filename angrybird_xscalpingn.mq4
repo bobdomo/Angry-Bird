@@ -1,33 +1,35 @@
-bool long_trade = FALSE;
-bool short_trade = FALSE;
-double average_price = 0;
-double rsi_current = 0;
-double rsi_previous = 0;
-double i_lots = 0;
-double i_takeprofit = 0;
-double last_buy_price = 0;
-double last_sell_price = 0;
-double price_target = 0;
-double slip = 3.0;
-extern int rsi_max = 75.0;
-extern int rsi_min = 30.0;
-extern int rsi_period = 6;
+bool long_trade          = FALSE;
+bool short_trade         = FALSE;
+double average_price     = 0;
+double i_lots            = 0;
+double i_takeprofit      = 0;
+double last_buy_price    = 0;
+double last_sell_price   = 0;
+double price_target      = 0;
+double rsi_current       = 0;
+double rsi_previous      = 0;
+double slip              = 3.0;
+extern int rsi_max       = 75.0;
+extern int rsi_min       = 30.0;
+extern int rsi_period    = 6;
 extern int rsi_smoothing = 6;
-extern double exp_base = 1.5;
-extern double lots = 0.01;
-int error = 0;
-int lotdecimal = 2;
-int magic_number = 2222;
-int pipstep = 200;
-int previous_time = 0;
-int total = 0;
-string comment = "";
-string name = "Ilan1.6";
+extern double exp_base   = 1.5;
+extern double lots       = 0.01;
+int error                = 0;
+int lotdecimal           = 2;
+int magic_number         = 2222;
+int pipstep              = 200;
+int previous_time        = 0;
+int total                = 0;
+string comment           = "";
+string name              = "Ilan1.6";
 
-int init() {
+int init()
+{
   Update();
-  if (total) {
-    last_buy_price = FindLastBuyPrice();
+  if (total)
+  {
+    last_buy_price  = FindLastBuyPrice();
     last_sell_price = FindLastSellPrice();
     UpdateAveragePrice();
     UpdateOpenOrders();
@@ -36,44 +38,56 @@ int init() {
 }
 
 int deinit() { return (0); }
-int start() {
-  /* Causes trading to wait a certain amount of time after a new bar opens */
+int start()
+{ /* Causes trading to wait a certain amount of time after a new bar opens */
   if (!IsOptimization()) Update();
   if (previous_time == Time[0]) return (0);
   previous_time = Time[0];
 
   /* All the actions that occur when a trade is signaled */
   int indicator_result = IndicatorSignal();
-  if (indicator_result > -1) {
+  if (indicator_result > -1)
+  {
     if (IsOptimization()) Update();
-
-    if (total == 0) {
-      if (indicator_result == OP_BUY) {
+    if (total == 0)
+    {
+      if (indicator_result == OP_BUY)
         error = OrderSend(Symbol(), OP_BUY, i_lots, Ask, slip, 0, 0, name,
                           magic_number, 0, clrLimeGreen);
-      } else if (indicator_result == OP_SELL) {
+      else if (indicator_result == OP_SELL)
         error = OrderSend(Symbol(), OP_SELL, i_lots, Bid, slip, 0, 0, name,
                           magic_number, 0, clrHotPink);
-      }
+
       NewOrdersPlaced();
-    } else {
-      if (indicator_result == OP_SELL) {
-        if (short_trade && Bid > last_sell_price + pipstep * Point) {
+    }
+    else
+    {
+      if (indicator_result == OP_SELL)
+      {
+        if (short_trade && Bid > last_sell_price + pipstep * Point)
+        {
           error = OrderSend(Symbol(), OP_SELL, i_lots, Bid, slip, 0, 0, name,
                             magic_number, 0, clrHotPink);
           NewOrdersPlaced();
-        } else if (long_trade && Ask < last_buy_price - pipstep * Point) {
+        }
+        else if (long_trade && Ask < last_buy_price - pipstep * Point)
+        {
           CloseThisSymbolAll();
           error = OrderSend(Symbol(), OP_SELL, i_lots, Bid, slip, 0, 0, name,
                             magic_number, 0, clrHotPink);
           NewOrdersPlaced();
         }
-      } else if (indicator_result == OP_BUY) {
-        if (long_trade && Ask < last_buy_price - pipstep * Point) {
+      }
+      else if (indicator_result == OP_BUY)
+      {
+        if (long_trade && Ask < last_buy_price - pipstep * Point)
+        {
           error = OrderSend(Symbol(), OP_BUY, i_lots, Ask, slip, 0, 0, name,
                             magic_number, 0, clrLimeGreen);
           NewOrdersPlaced();
-        } else if (short_trade && Bid > last_sell_price + pipstep * Point) {
+        }
+        else if (short_trade && Bid > last_sell_price + pipstep * Point)
+        {
           CloseThisSymbolAll();
           error = OrderSend(Symbol(), OP_BUY, i_lots, Ask, slip, 0, 0, name,
                             magic_number, 0, clrLimeGreen);
@@ -85,87 +99,105 @@ int start() {
   return (0);
 }
 
-void Update() {
-  if (error < 0) {
+void Update()
+{
+  if (error < 0)
+  {
     if ((IsTesting() || IsOptimization()) && error < 0)
       error = OrderSend(Symbol(), OP_BUY, AccountFreeMargin() / Bid, Ask, slip,
                         0, 0, 0, magic_number, 0, 0);
     Alert("Error " + GetLastError());
   }
-  total = CountTrades();
-  double commission = CalculateCommission() * -1;
-  double all_lots = CalculateLots();
-  double delta = MarketInfo(Symbol(), MODE_TICKVALUE) * all_lots;
-  double order_spread = 0;
-  double lot_multiplier = MathPow(exp_base, (total));
-  int time_difference = TimeCurrent() - Time[0];
-  int tp_dist = 0;
-  i_lots = NormalizeDouble(lots * lot_multiplier, lotdecimal);
 
-  if (total == 0) { /* Reset */
-    short_trade = FALSE;
-    long_trade = FALSE;
-  } else {
-    /* Zero divide issue*/
+  total                 = CountTrades();
+  int tp_dist           = 0;
+  int time_difference   = TimeCurrent() - Time[0];
+  double order_spread   = 0;
+  double commission     = CalculateCommission() * -1;
+  double all_lots       = CalculateLots();
+  double delta          = MarketInfo(Symbol(), MODE_TICKVALUE) * all_lots;
+  double lot_multiplier = MathPow(exp_base, (total));
+  i_lots                = NormalizeDouble(lots * lot_multiplier, lotdecimal);
+
+  if (total == 0)
+  { /* Reset */
+    i_takeprofit = 2000;
+    short_trade  = FALSE;
+    long_trade   = FALSE;
+  }
+  else
+  { /* Zero divide issue*/
     i_takeprofit = (commission / delta) + (0.01 / delta);
   }
 
-  if (short_trade) {
-    tp_dist = (Bid - price_target) / Point;
+  if (short_trade)
+  {
+    tp_dist      = (Bid - price_target) / Point;
     order_spread = (last_sell_price - price_target) / Point;
-  } else if (long_trade) {
-    tp_dist = (price_target - Ask) / Point;
+  }
+  else if (long_trade)
+  {
+    tp_dist      = (price_target - Ask) / Point;
     order_spread = (price_target - last_buy_price) / Point;
   }
-  /* Comments debug info except when optimizing */
-    Comment(
-            "\nRSI: " + (int) rsi_current +
-            "\nShort Trade: " + short_trade +
-            "\nLong Trade: " + long_trade +
-            "\nNext Order: " + i_lots +
-            "\nAverage Price: " + NormalizeDouble(average_price, lotdecimal) +
-            "\nOrder Spread: " + (int) order_spread +
-            "\nTake Profit: " + (int) i_takeprofit +
+
+  Comment(
+            "\nRSI: "                  + (int) rsi_current + " : " + (int) rsi_previous +
+            "\nShort | Long: "         + short_trade + " : " + long_trade +
+            "\nNext Order: "           + i_lots +
+            "\nAverage Price: "        + NormalizeDouble(average_price, Digits) +
+            "\nOrder Spread: "         + (int) order_spread +
+            "\nTake Profit: "          + (int) i_takeprofit +
             "\nTake Profit Distance: " + tp_dist +
-            "\nTime Difference: " + time_difference
-            );
+            "\nTime Difference: "      + time_difference
+        );
 }
 
-void NewOrdersPlaced() {
-  last_buy_price = FindLastBuyPrice();
+void NewOrdersPlaced()
+{
+  last_buy_price  = FindLastBuyPrice();
   last_sell_price = FindLastSellPrice();
   Update();
   UpdateAveragePrice();
   UpdateOpenOrders();
 }
 
-void UpdateAveragePrice() {
+void UpdateAveragePrice()
+{
   average_price = 0;
-  double count = 0;
-  for (int i = 0; i < total; i++) {
+  double count  = 0;
+  for (int i = 0; i < total; i++)
+  {
     error = OrderSelect(i, SELECT_BY_POS, MODE_TRADES);
-    if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
+    if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number)
+    {
       average_price += OrderOpenPrice() * OrderLots();
-      count += OrderLots();
+      count         += OrderLots();
     }
   }
-  average_price /= total;
-  count /= total;
+  count         = count         / total;
+  average_price = average_price / total;
   average_price = average_price / count;
 }
 
-void UpdateOpenOrders() {
-  for (int i = 0; i < total; i++) {
+void UpdateOpenOrders()
+{
+  for (int i = 0; i < total; i++)
+  {
     error = OrderSelect(i, SELECT_BY_POS, MODE_TRADES);
-    if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
-      if (OrderType() == OP_BUY) {
+    if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number)
+    {
+      if (OrderType() == OP_BUY)
+      {
         price_target = average_price + (i_takeprofit * Point);
-        short_trade = FALSE;
-        long_trade = TRUE;
-      } else if (OrderType() == OP_SELL) {
+        short_trade  = FALSE;
+        long_trade   = TRUE;
+      }
+      else if (OrderType() == OP_SELL)
+      {
         price_target = average_price - (i_takeprofit * Point);
-        short_trade = TRUE;
-        long_trade = FALSE;
+        short_trade  = TRUE;
+        long_trade   = FALSE;
       }
       error = OrderModify(OrderTicket(), NULL,
                           NormalizeDouble(OrderStopLoss(), Digits),
@@ -174,27 +206,28 @@ void UpdateOpenOrders() {
   }
 }
 
-int IndicatorSignal() {
-  rsi_current = 0;
+int IndicatorSignal()
+{
+  rsi_current  = 0;
   rsi_previous = 0;
-  for (int i = 0; i < rsi_smoothing; i++) {
-    rsi_current += iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, i + 1);
+  for (int i = 0; i < rsi_smoothing; i++)
+  {
+    rsi_current  += iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, i + 1);
     rsi_previous += iRSI(NULL, 0, rsi_period, PRICE_TYPICAL, i + 2);
   }
-  rsi_current /= rsi_smoothing;
+  rsi_current  /= rsi_smoothing;
   rsi_previous /= rsi_smoothing;
 
-  if (rsi_current > rsi_max && rsi_previous < rsi_max) return OP_SELL;
-  if (rsi_current < rsi_min && rsi_previous > rsi_min) return OP_BUY;
-  //if (rsi_current < rsi_max && rsi_previous > rsi_max) return OP_SELL;
-  //if (rsi_current > rsi_min && rsi_previous < rsi_min) return OP_BUY;
+  if (rsi_previous > rsi_max && rsi_current < rsi_previous) return OP_SELL;
+  if (rsi_previous < rsi_min && rsi_current > rsi_previous) return OP_BUY;
   return (-1);
 }
 
-int CountTrades() {
+int CountTrades()
+{
   int count = 0;
-
-  for (int trade = OrdersTotal() - 1; trade >= 0; trade--) {
+  for (int trade = OrdersTotal() - 1; trade >= 0; trade--)
+  {
     error = OrderSelect(trade, SELECT_BY_POS, MODE_TRADES);
     if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number)
       if (OrderType() == OP_SELL || OrderType() == OP_BUY) count++;
@@ -202,24 +235,26 @@ int CountTrades() {
   return (count);
 }
 
-void CloseThisSymbolAll() {
-  for (int trade = OrdersTotal() - 1; trade >= 0; trade--) {
+void CloseThisSymbolAll()
+{
+  for (int trade = OrdersTotal() - 1; trade >= 0; trade--)
+  {
     error = OrderSelect(trade, SELECT_BY_POS, MODE_TRADES);
-    if (OrderSymbol() == Symbol()) {
-      if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number) {
-        if (OrderType() == OP_BUY)
-          error = OrderClose(OrderTicket(), OrderLots(), Bid, slip, Blue);
-      }
+    if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number)
+    {
+      if (OrderType() == OP_BUY)
+        error = OrderClose(OrderTicket(), OrderLots(), Bid, slip, Blue);
       if (OrderType() == OP_SELL)
         error = OrderClose(OrderTicket(), OrderLots(), Ask, slip, Red);
     }
-    Sleep(1000);
   }
 }
 
-double CalculateProfit() {
+double CalculateProfit()
+{
   double Profit = 0;
-  for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
+  for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--)
+  {
     error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
     if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number)
       if (OrderType() == OP_BUY || OrderType() == OP_SELL)
@@ -228,9 +263,11 @@ double CalculateProfit() {
   return (Profit);
 }
 
-double CalculateCommission() {
+double CalculateCommission()
+{
   double commission = 0;
-  for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
+  for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--)
+  {
     error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
     if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number)
       if (OrderType() == OP_BUY || OrderType() == OP_SELL)
@@ -239,47 +276,59 @@ double CalculateCommission() {
   return (commission);
 }
 
-double CalculateLots() {
+double CalculateLots()
+{
   double lot = 0;
-  for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
+  for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--)
+  {
     error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
     if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number)
       if (OrderType() == OP_BUY || OrderType() == OP_SELL)
+      {
         lot += OrderLots();
+      }
   }
   return (lot);
 }
 
-double FindLastBuyPrice() {
+double FindLastBuyPrice()
+{
   double oldorderopenprice;
   int oldticketnumber;
   int ticketnumber = 0;
-  for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
+  for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--)
+  {
     error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
     if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number &&
-        OrderType() == OP_BUY) {
+        OrderType() == OP_BUY)
+    {
       oldticketnumber = OrderTicket();
-      if (oldticketnumber > ticketnumber) {
+      if (oldticketnumber > ticketnumber)
+      {
         oldorderopenprice = OrderOpenPrice();
-        ticketnumber = oldticketnumber;
+        ticketnumber      = oldticketnumber;
       }
     }
   }
   return (oldorderopenprice);
 }
 
-double FindLastSellPrice() {
+double FindLastSellPrice()
+{
   double oldorderopenprice;
   int oldticketnumber;
   int ticketnumber = 0;
-  for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--) {
+  for (int cnt = OrdersTotal() - 1; cnt >= 0; cnt--)
+  {
     error = OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
     if (OrderSymbol() == Symbol() && OrderMagicNumber() == magic_number &&
-        OrderType() == OP_SELL) {
+        OrderType() == OP_SELL)
+    {
       oldticketnumber = OrderTicket();
-      if (oldticketnumber > ticketnumber) {
+      if (oldticketnumber > ticketnumber)
+      {
         oldorderopenprice = OrderOpenPrice();
-        ticketnumber = oldticketnumber;
+        ticketnumber      = oldticketnumber;
       }
     }
   }
