@@ -1,6 +1,5 @@
 bool long_trade = FALSE;
 bool short_trade = FALSE;
-bool trade_now = FALSE;
 double average_price = 0;
 double rsi_current = 0;
 double rsi_previous = 0;
@@ -8,9 +7,7 @@ double i_lots = 0;
 double i_takeprofit = 0;
 double last_buy_price = 0;
 double last_sell_price = 0;
-double lot_multiplier = 0;
 double price_target = 0;
-double order_spread = 0;
 double slip = 3.0;
 extern int rsi_max = 75.0;
 extern int rsi_min = 30.0;
@@ -23,9 +20,7 @@ int lotdecimal = 2;
 int magic_number = 2222;
 int pipstep = 200;
 int previous_time = 0;
-int time_difference = 0;
 int total = 0;
-int tp_dist;
 string comment = "";
 string name = "Ilan1.6";
 
@@ -91,21 +86,27 @@ int start() {
 }
 
 void Update() {
-  if (error < 0) Alert("Error " + GetLastError());
-  time_difference = TimeCurrent() - Time[0];
+  if (error < 0) {
+    if ((IsTesting() || IsOptimization()) && error < 0)
+      error = OrderSend(Symbol(), OP_BUY, AccountFreeMargin() / Bid, Ask, slip,
+                        0, 0, 0, magic_number, 0, 0);
+    Alert("Error " + GetLastError());
+  }
   total = CountTrades();
-  lot_multiplier = MathPow(exp_base, (total));
-  i_lots = NormalizeDouble(lots * lot_multiplier, lotdecimal);
-
   double commission = CalculateCommission() * -1;
   double all_lots = CalculateLots();
   double delta = MarketInfo(Symbol(), MODE_TICKVALUE) * all_lots;
+  double order_spread = 0;
+  double lot_multiplier = MathPow(exp_base, (total));
+  int time_difference = TimeCurrent() - Time[0];
+  int tp_dist = 0;
+  i_lots = NormalizeDouble(lots * lot_multiplier, lotdecimal);
 
-  if (total == 0) {
-    i_takeprofit = 2000;
+  if (total == 0) { /* Reset */
     short_trade = FALSE;
     long_trade = FALSE;
   } else {
+    /* Zero divide issue*/
     i_takeprofit = (commission / delta) + (0.01 / delta);
   }
 
@@ -115,28 +116,22 @@ void Update() {
   } else if (long_trade) {
     tp_dist = (price_target - Ask) / Point;
     order_spread = (price_target - last_buy_price) / Point;
-  } else
-    tp_dist = 0;
-
+  }
   /* Comments debug info except when optimizing */
     Comment(
+            "\nRSI: " + (int) rsi_current +
             "\nShort Trade: " + short_trade +
             "\nLong Trade: " + long_trade +
             "\nNext Order: " + i_lots +
-            "\nAverage Price: " + average_price +
+            "\nAverage Price: " + NormalizeDouble(average_price, lotdecimal) +
             "\nOrder Spread: " + (int) order_spread +
             "\nTake Profit: " + (int) i_takeprofit +
-            "\nTake Profit Distance: " + tp_dist
+            "\nTake Profit Distance: " + tp_dist +
+            "\nTime Difference: " + time_difference
             );
 }
 
 void NewOrdersPlaced() {
-  if ((IsTesting() || IsOptimization()) && error < 0) {
-    /* Prevents failed tests appearing in results */
-    error = OrderSend(Symbol(), OP_BUY, AccountFreeMargin() / Bid, Ask, slip, 0,
-                      0, 0, magic_number, 0, 0);
-    ExpertRemove();
-  }
   last_buy_price = FindLastBuyPrice();
   last_sell_price = FindLastSellPrice();
   Update();
@@ -191,6 +186,8 @@ int IndicatorSignal() {
 
   if (rsi_current > rsi_max && rsi_previous < rsi_max) return OP_SELL;
   if (rsi_current < rsi_min && rsi_previous > rsi_min) return OP_BUY;
+  //if (rsi_current < rsi_max && rsi_previous > rsi_max) return OP_SELL;
+  //if (rsi_current > rsi_min && rsi_previous < rsi_min) return OP_BUY;
   return (-1);
 }
 
