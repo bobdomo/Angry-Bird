@@ -13,6 +13,7 @@ extern int rsi_max       = 75.0;
 extern int rsi_min       = 30.0;
 extern int rsi_period    = 6;
 extern int rsi_smoothing = 6;
+extern double rsi_turn   = 0.1;
 extern double exp_base   = 1.5;
 extern double lots       = 0.01;
 int error                = 0;
@@ -48,7 +49,7 @@ int start()
   int indicator_result = IndicatorSignal();
   if (indicator_result > -1)
   {
-    if (IsOptimization()) Update();
+    Update();
     if (total == 0)
     {
       if (indicator_result == OP_BUY)
@@ -101,18 +102,8 @@ int start()
 
 void Update()
 {
-  if (error < 0)
-  {
-    if ((IsTesting() || IsOptimization()) && error < 0)
-      error = OrderSend(Symbol(), OP_BUY, AccountFreeMargin() / Bid, Ask, slip,
-                        0, 0, 0, magic_number, 0, 0);
-    Alert("Error " + GetLastError());
-  }
-
   total                 = CountTrades();
-  int tp_dist           = 0;
-  int time_difference   = TimeCurrent() - Time[0];
-  double order_spread   = 0;
+  name                  = (rsi_current - rsi_previous);
   double commission     = CalculateCommission() * -1;
   double all_lots       = CalculateLots();
   double delta          = MarketInfo(Symbol(), MODE_TICKVALUE) * all_lots;
@@ -122,6 +113,7 @@ void Update()
   if (total == 0)
   { /* Reset */
     i_takeprofit = 2000;
+    //average_price = 0;
     short_trade  = FALSE;
     long_trade   = FALSE;
   }
@@ -129,20 +121,27 @@ void Update()
   { /* Zero divide issue*/
     i_takeprofit = (commission / delta) + (0.01 / delta);
   }
-
-  if (short_trade)
+  
+  if (!IsOptimization())
   {
-    tp_dist      = (Bid - price_target) / Point;
-    order_spread = (last_sell_price - price_target) / Point;
-  }
-  else if (long_trade)
-  {
-    tp_dist      = (price_target - Ask) / Point;
-    order_spread = (price_target - last_buy_price) / Point;
-  }
-
-  Comment(
-            "\nRSI: "                  + (int) rsi_current + " : " + (int) rsi_previous +
+    int tp_dist           = 0;
+    int time_difference   = TimeCurrent() - Time[0];
+    double order_spread   = 0;
+  
+    if (short_trade)
+    {
+      tp_dist      = (Bid - price_target) / Point;
+      order_spread = (last_sell_price - price_target) / Point;
+    }
+    else if (long_trade)
+    {
+      tp_dist      = (price_target - Ask) / Point;
+      order_spread = (price_target - last_buy_price) / Point;
+    }
+  
+    Comment(
+            "\nRSI: "                  + name +
+            "\nRSI Turn: "             + rsi_turn +
             "\nShort | Long: "         + short_trade + " : " + long_trade +
             "\nNext Order: "           + i_lots +
             "\nAverage Price: "        + NormalizeDouble(average_price, Digits) +
@@ -150,11 +149,20 @@ void Update()
             "\nTake Profit: "          + (int) i_takeprofit +
             "\nTake Profit Distance: " + tp_dist +
             "\nTime Difference: "      + time_difference
-        );
+           );
+  }
 }
 
 void NewOrdersPlaced()
 {
+  if (IsTesting() && error < 0)
+  {
+    CloseThisSymbolAll();
+    error = OrderSend(Symbol(), OP_BUY, AccountFreeMargin() / Bid, Ask, slip, 0, 0, name,
+                      magic_number, 0, clrLimeGreen);
+    ExpertRemove();
+  }
+  
   last_buy_price  = FindLastBuyPrice();
   last_sell_price = FindLastSellPrice();
   Update();
@@ -217,9 +225,9 @@ int IndicatorSignal()
   }
   rsi_current  /= rsi_smoothing;
   rsi_previous /= rsi_smoothing;
-
-  if (rsi_previous > rsi_max && rsi_current < rsi_previous) return OP_SELL;
-  if (rsi_previous < rsi_min && rsi_current > rsi_previous) return OP_BUY;
+  
+  if (rsi_current > rsi_max && rsi_current - rsi_previous <=  rsi_turn) return OP_SELL;
+  if (rsi_current < rsi_min && rsi_current - rsi_previous >= -rsi_turn) return OP_BUY;
   return (-1);
 }
 
