@@ -14,7 +14,6 @@ extern int rsi_min       = 40.0;
 extern int rsi_period    = 12;
 extern int rsi_smoothing = 4;
 extern int dev_period    = 12;
-extern double rsi_turn   = 0;
 extern double exp_base   = 1.5;
 extern double lots       = 0.01;
 extern double target     = 0.01;
@@ -140,10 +139,9 @@ void Update()
       order_spread = (price_target - last_buy_price) / Point;
     }
 
-    name = "RSI: " + NormalizeDouble(rsi_current, lotdecimal) + " | " +
-            NormalizeDouble(rsi_previous, lotdecimal) + "\n";
+    name = "RSI: " + NormalizeDouble(rsi_current, lotdecimal);
     Comment(
-            "RSI: "                   + NormalizeDouble((rsi_current - rsi_previous), lotdecimal) +
+            "RSI: "                   + NormalizeDouble((rsi_current), lotdecimal) +
         //  " Short | Long: "         + short_trade + " : " + long_trade +
         //  " Next Order: "           + i_lots +
         //  " Average Price: "        + NormalizeDouble(average_price, Digits) +
@@ -228,8 +226,8 @@ int IndicatorSignal()
   rsi_current  /= rsi_smoothing;
   rsi_previous /= rsi_smoothing;
 
-  if (rsi_current > rsi_max && rsi_current - rsi_previous < rsi_turn) return OP_SELL;
-  if (rsi_current < rsi_min && rsi_current - rsi_previous > -rsi_turn) return OP_BUY;
+  if (rsi_current > rsi_max) return OP_SELL;
+  if (rsi_current < rsi_min) return OP_BUY;
   return (-1);
 }
 
