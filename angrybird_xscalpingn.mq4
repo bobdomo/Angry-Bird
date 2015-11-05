@@ -9,17 +9,19 @@ double price_target      = 0;
 double rsi_current       = 0;
 double rsi_previous      = 0;
 double slip              = 3.0;
-extern int rsi_max       = 75.0;
-extern int rsi_min       = 30.0;
-extern int rsi_period    = 6;
-extern int rsi_smoothing = 6;
-extern double rsi_turn   = 0.1;
+extern int rsi_max       = 70.0;
+extern int rsi_min       = 40.0;
+extern int rsi_period    = 12;
+extern int rsi_smoothing = 4;
+extern int dev_period    = 12;
+extern double rsi_turn   = 0;
 extern double exp_base   = 1.5;
 extern double lots       = 0.01;
+extern double target     = 0.01;
 int error                = 0;
 int lotdecimal           = 2;
 int magic_number         = 2222;
-int pipstep              = 200;
+int pipstep              = 0;
 int previous_time        = 0;
 int total                = 0;
 string comment           = "";
@@ -40,7 +42,7 @@ int init()
 
 int deinit() { return (0); }
 int start()
-{ /* Causes trading to wait a certain amount of time after a new bar opens */
+{ /* Sleeps until next bar opens if a trade is made */
   if (!IsOptimization()) Update();
   if (previous_time == Time[0]) return (0);
   previous_time = Time[0];
@@ -103,7 +105,7 @@ int start()
 void Update()
 {
   total                 = CountTrades();
-  name                  = (rsi_current - rsi_previous);
+  pipstep               = 1 * (iStdDev(NULL, 0, dev_period, 0, MODE_SMA, PRICE_TYPICAL, 0) / Point);
   double commission     = CalculateCommission() * -1;
   double all_lots       = CalculateLots();
   double delta          = MarketInfo(Symbol(), MODE_TICKVALUE) * all_lots;
@@ -113,21 +115,20 @@ void Update()
   if (total == 0)
   { /* Reset */
     i_takeprofit = 2000;
-    //average_price = 0;
     short_trade  = FALSE;
     long_trade   = FALSE;
   }
   else
-  { /* Zero divide issue*/
-    i_takeprofit = (commission / delta) + (0.01 / delta);
+  { /* Zero divide issue*/ /* TODO */
+      i_takeprofit = (commission / delta) + (target / delta);
   }
-  
+
   if (!IsOptimization())
   {
     int tp_dist           = 0;
     int time_difference   = TimeCurrent() - Time[0];
     double order_spread   = 0;
-  
+
     if (short_trade)
     {
       tp_dist      = (Bid - price_target) / Point;
@@ -138,17 +139,19 @@ void Update()
       tp_dist      = (price_target - Ask) / Point;
       order_spread = (price_target - last_buy_price) / Point;
     }
-  
+
+    name = "RSI: " + NormalizeDouble(rsi_current, lotdecimal) + " | " +
+            NormalizeDouble(rsi_previous, lotdecimal) + "\n";
     Comment(
-            "\nRSI: "                  + name +
-            "\nRSI Turn: "             + rsi_turn +
-            "\nShort | Long: "         + short_trade + " : " + long_trade +
-            "\nNext Order: "           + i_lots +
-            "\nAverage Price: "        + NormalizeDouble(average_price, Digits) +
-            "\nOrder Spread: "         + (int) order_spread +
-            "\nTake Profit: "          + (int) i_takeprofit +
-            "\nTake Profit Distance: " + tp_dist +
-            "\nTime Difference: "      + time_difference
+            "RSI: "                   + NormalizeDouble((rsi_current - rsi_previous), lotdecimal) +
+        //  " Short | Long: "         + short_trade + " : " + long_trade +
+        //  " Next Order: "           + i_lots +
+        //  " Average Price: "        + NormalizeDouble(average_price, Digits) +
+            " Spread: "               + (int) order_spread +
+            " Take Profit: "          + (int) i_takeprofit +
+      //    " Take Profit Distance: " + tp_dist +
+            " Pipstep: "              + pipstep +
+            " Time: "                 + time_difference
            );
   }
 }
@@ -162,7 +165,6 @@ void NewOrdersPlaced()
                       magic_number, 0, clrLimeGreen);
     ExpertRemove();
   }
-  
   last_buy_price  = FindLastBuyPrice();
   last_sell_price = FindLastSellPrice();
   Update();
@@ -225,9 +227,9 @@ int IndicatorSignal()
   }
   rsi_current  /= rsi_smoothing;
   rsi_previous /= rsi_smoothing;
-  
-  if (rsi_current > rsi_max && rsi_current - rsi_previous <=  rsi_turn) return OP_SELL;
-  if (rsi_current < rsi_min && rsi_current - rsi_previous >= -rsi_turn) return OP_BUY;
+
+  if (rsi_current > rsi_max && rsi_current - rsi_previous < rsi_turn) return OP_SELL;
+  if (rsi_current < rsi_min && rsi_current - rsi_previous > -rsi_turn) return OP_BUY;
   return (-1);
 }
 
